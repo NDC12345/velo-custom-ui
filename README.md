@@ -62,7 +62,7 @@ Your Velociraptor server must be reachable from the machine running this stack. 
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/your-org/velo-custom-ui.git
+git clone https://github.com/NDC12345/velo-custom-ui.git
 cd velo-custom-ui
 
 # Copy the environment template and fill in values
@@ -439,8 +439,6 @@ Reduce `JWT_ACCESS_EXPIRES_IN` claims are too short or clocks are out of sync. C
 
 ---
 
-## License
 
-This project is proprietary software. All rights reserved. Redistribution or commercial use without a valid license agreement is prohibited.
 
 For licensing inquiries contact: **your-email@company.com**
