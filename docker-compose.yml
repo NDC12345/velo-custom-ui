@@ -1,0 +1,170 @@
+services:
+  # Redis — GeoIP cache + WebSocket pub/sub backbone
+  redis:
+    image: redis:7-alpine
+    container_name: velo-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru --save ""
+    networks:
+      - velo-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: velo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-velo_custom}
+      POSTGRES_USER: ${DB_USER:-velo_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/migrations/002_add_avatar_column.sql:/docker-entrypoint-initdb.d/02-migration-avatar.sql:ro
+      - ./database/migrations/002_token_revocation.sql:/docker-entrypoint-initdb.d/03-migration-revocation.sql:ro
+      - ./database/migrations/003_add_velo_server_url.sql:/docker-entrypoint-initdb.d/04-migration-velo-server-url.sql:ro
+      - ./database/migrations/004_case_management.sql:/docker-entrypoint-initdb.d/05-migration-case-management.sql:ro
+      - ./database/migrations/005_multi_org_and_enterprise.sql:/docker-entrypoint-initdb.d/06-migration-enterprise.sql:ro
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    networks:
+      - velo-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-velo_admin} -d ${DB_NAME:-velo_custom}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend Service
+  backend:
+    build:
+      context: ./backend
+      target: production
+      dockerfile: Dockerfile
+    container_name: velo-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      HOST: 0.0.0.0
+      
+      # Database
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-velo_custom}
+      DB_USER: ${DB_USER:-velo_admin}
+      DB_PASSWORD: ${DB_PASSWORD}
+      
+      # JWT Secrets
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      
+      # Encryption
+      VELO_CREDENTIALS_ENCRYPTION_KEY: ${VELO_CREDENTIALS_ENCRYPTION_KEY}
+      
+      # Velociraptor API
+      VELO_API_BASE_URL: ${VELO_API_BASE_URL:-https://e373-58-187-149-116.ngrok-free.app}
+      VELO_API_TIMEOUT: ${VELO_API_TIMEOUT:-30000}
+      VELO_API_VERIFY_SSL: ${VELO_API_VERIFY_SSL:-false}
+      VELO_SKIP_AUTH_CHECK: ${VELO_SKIP_AUTH_CHECK:-false}
+      
+      # CORS
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000,http://localhost:5000,https://e373-58-187-149-116.ngrok-free.app}
+      CORS_CREDENTIALS: ${CORS_CREDENTIALS:-true}
+      
+      # Rate Limiting
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
+      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-100}
+      AUTH_RATE_LIMIT_MAX: ${AUTH_RATE_LIMIT_MAX:-5}
+      AI_RATE_LIMIT_MAX: ${AI_RATE_LIMIT_MAX:-20}
+      
+      # Google AI Studio
+      GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY:-}
+      GOOGLE_AI_MODEL: ${GOOGLE_AI_MODEL:-gemini-1.5-pro}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_FILE: ${LOG_FILE:-logs/app.log}
+
+      # Redis (GeoIP cache + WebSocket backbone)
+      REDIS_URL: redis://redis:6379
+      REDIS_GEO_TTL_DAYS: ${REDIS_GEO_TTL_DAYS:-7}
+
+      # MaxMind GeoLite2 MMDB (optional — falls back to ip-api.com if absent)
+      MMDB_PATH: /geoip/GeoLite2-City.mmdb
+
+      # WebSocket
+      WS_HEARTBEAT_MS: ${WS_HEARTBEAT_MS:-30000}
+      WS_DIFF_INTERVAL_MS: ${WS_DIFF_INTERVAL_MS:-2000}
+      WS_POLL_INTERVAL_MS: ${WS_POLL_INTERVAL_MS:-10000}
+      
+      # Security
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      COOKIE_SECRET: ${COOKIE_SECRET}
+      
+      # Velociraptor org isolation (leave blank for the default org)
+      VELO_ORG_ID: ${VELO_ORG_ID:-}
+      
+      # JWT tuning
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+    volumes:
+      - backend_logs:/app/logs
+      - backend_uploads:/app/uploads
+      - ./geoip-data:/geoip:ro
+    ports:
+      - "${BACKEND_PORT:-5000}:5000"
+    networks:
+      - velo-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:5000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend Service
+  frontend:
+    build:
+      context: ./frontend
+      target: production
+      dockerfile: Dockerfile
+    container_name: velo-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    networks:
+      - velo-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+  backend_logs:
+    driver: local
+  backend_uploads:
+    driver: local
+
+networks:
+  velo-network:
+    driver: bridge

@@ -1,0 +1,39 @@
+# ─── Environment ─────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.env
+
+# ─── Dependencies ────────────────────────────────────
+node_modules/
+package-lock.json
+yarn.lock
+
+# ─── Build outputs ───────────────────────────────────
+backend/dist/
+frontend/dist/
+
+# ─── Logs ────────────────────────────────────────────
+*.log
+logs/
+backend/logs/
+
+# ─── Coverage ────────────────────────────────────────
+coverage/
+.nyc_output/
+
+# ─── IDE ─────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+.DS_Store
+Thumbs.db
+
+# ─── Docker ──────────────────────────────────────────
+docker-compose.override.yml
+
+# ─── Uploads ─────────────────────────────────────────
+backend/uploads/*
+!backend/uploads/.gitkeep

@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* XDR theme tokens - defined as CSS custom properties */
+@layer base {
+  :root {
+    --color-xdr-bg:      #020d1a;
+    --color-xdr-surface: #071a2e;
+    --color-xdr-border:  #0d2a45;
+    --color-xdr-accent:  #00c8ff;
+    --color-xdr-green:   #00ff9d;
+    --color-xdr-amber:   #f59e0b;
+    --color-xdr-red:     #ef4444;
+    --color-xdr-muted:   #4a7fa5;
+    --font-family-mono:  'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    --font-family-sans:  'Inter', ui-sans-serif, system-ui, sans-serif;
+    --shadow-xdr:        0 0 20px rgba(0, 200, 255, 0.08);
+    --shadow-glow:       0 0 12px rgba(0, 200, 255, 0.3);
+  }
+}
+
+/* XDR utility classes */
+@layer components {
+  .xdr-card {
+    background-color: #071a2e;
+    border: 1px solid #0d2a45;
+    border-radius: 6px;
+    box-shadow: 0 0 20px rgba(0, 200, 255, 0.08);
+  }
+  .xdr-label {
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #4a7fa5;
+  }
+  .xdr-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #ffffff;
+  }
+  .xdr-badge-online  { display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; font-family: monospace; color: #00ff9d; }
+  .xdr-badge-offline { display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; font-family: monospace; color: #4a7fa5; }
+  .xdr-badge-critical{ display: inline-flex; align-items: center; gap: 4px; font-size: 0.75rem; font-family: monospace; color: #ef4444; }
+}
