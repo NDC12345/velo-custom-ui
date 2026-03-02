@@ -15,18 +15,19 @@
           </div>
           <div class="settings-card-body">
             <div class="profile-section">
-              <div class="avatar-wrapper" @click="triggerAvatarUpload">
+              <div class="avatar-wrapper" @click="!uploadingAvatar && triggerAvatarUpload()" :class="{ 'avatar-loading': uploadingAvatar }">
                 <v-avatar size="80" class="avatar-editable">
-                  <v-img v-if="userAvatar" :src="userAvatar" />
+                  <v-progress-circular v-if="uploadingAvatar" indeterminate color="white" size="32" />
+                  <v-img v-else-if="userAvatar" :src="userAvatar" />
                   <span v-else class="text-h4 text-white">{{ userInitials }}</span>
                 </v-avatar>
                 <div class="avatar-overlay">
-                  <v-icon size="20" color="white">mdi-camera</v-icon>
+                  <v-icon size="20" color="white">{{ uploadingAvatar ? 'mdi-loading' : 'mdi-camera' }}</v-icon>
                 </div>
                 <input
                   ref="avatarInput"
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
                   style="display: none"
                   @change="onAvatarSelected"
                 />
@@ -420,6 +421,20 @@
       </v-col>
     </v-row>
   </div>
+
+  <!-- Avatar upload feedback snackbar -->
+  <v-snackbar
+    v-model="avatarSnackbar.show"
+    :color="avatarSnackbar.color"
+    :timeout="3500"
+    location="top"
+    rounded="xl"
+  >
+    {{ avatarSnackbar.message }}
+    <template #actions>
+      <v-btn variant="text" @click="avatarSnackbar.show = false">Close</v-btn>
+    </template>
+  </v-snackbar>
 </template>
 
 <script setup>
@@ -439,6 +454,8 @@ const userInitials = computed(() => {
 
 const userAvatar = ref(null)
 const avatarInput = ref(null)
+const uploadingAvatar = ref(false)
+const avatarSnackbar = ref({ show: false, color: 'success', message: '' })
 
 // Connection
 const connectionStatus = ref('unknown')
@@ -582,12 +599,32 @@ function fileToDataUrl(file) {
 const onAvatarSelected = async (event) => {
   const file = event.target.files[0]
   if (!file) return
+
+  // Client-side size guard (5 MB)
+  if (file.size > 5 * 1024 * 1024) {
+    avatarSnackbar.value = { show: true, color: 'error', message: 'Image too large. Maximum size is 5 MB.' }
+    // Reset input so the same file can be re-selected if user resizes it
+    if (avatarInput.value) avatarInput.value.value = ''
+    return
+  }
+
+  uploadingAvatar.value = true
   try {
     const dataUri = await fileToDataUrl(file)
     const avatarUrl = await userService.uploadAvatarBase64(dataUri)
     userAvatar.value = userService.getAvatarUrl(avatarUrl)
+    // Refresh the auth store so the new avatar_url is persisted in sessionStorage
+    // and reflected in all components (e.g. MainLayout) without a full page reload.
+    await authStore.fetchCurrentUser()
+    avatarSnackbar.value = { show: true, color: 'success', message: 'Avatar updated successfully!' }
   } catch (err) {
     console.error('Avatar upload failed:', err)
+    const msg = err?.response?.data?.error || 'Failed to upload avatar. Please try again.'
+    avatarSnackbar.value = { show: true, color: 'error', message: msg }
+  } finally {
+    uploadingAvatar.value = false
+    // Reset input so the same file may be re-selected later
+    if (avatarInput.value) avatarInput.value.value = ''
   }
 }
 
@@ -600,14 +637,23 @@ const testConnection = async () => {
   testingConnection.value = true
   connectionMessage.value = ''
   try {
-    const res = await api.get('/api/users/me/traits')
-    connectionStatus.value = 'connected'
-    connectionMessage.value = 'Successfully connected to Velociraptor server.'
-    lastVerified.value = new Date().toLocaleString()
-    const url = res.data?._configured_server_url || res.data?.interface || ''
-    if (url) {
-      veloServerUrl.value = url
-      veloServerUrlEdit.value = url
+    // Use the dedicated Velo health endpoint (/api/health/velo) instead of
+    // /api/users/me/traits — the traits endpoint requires a live Velociraptor
+    // session and a 401 from it would trigger the token-refresh dance,
+    // potentially bouncing the user to /login with a blank screen.
+    const res = await api.get('/api/health/velo')
+    if (res.data?.status === 'ok' || res.data?.connected) {
+      connectionStatus.value = 'connected'
+      connectionMessage.value = 'Successfully connected to Velociraptor server.'
+      lastVerified.value = new Date().toLocaleString()
+      const url = res.data?.serverUrl || res.data?.url || ''
+      if (url) {
+        veloServerUrl.value = url
+        veloServerUrlEdit.value = url
+      }
+    } else {
+      connectionStatus.value = 'disconnected'
+      connectionMessage.value = res.data?.message || 'Velociraptor server unreachable.'
     }
   } catch (err) {
     connectionStatus.value = 'disconnected'
@@ -811,6 +857,11 @@ onMounted(async () => {
 .avatar-wrapper {
   position: relative;
   cursor: pointer;
+}
+
+.avatar-wrapper.avatar-loading {
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .avatar-editable {

@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const helmet = require('helmet');
 const compression = require('compression');
 const cors = require('cors');
@@ -115,7 +116,8 @@ app.get('/health', async (req, res) => {
 });
 
 // ─── Static uploads ───────────────────────────────────────────────────────────
-app.use('/uploads', express.static('uploads'));
+// Use an absolute path so this works regardless of the cwd at startup
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // ─── API routes ───────────────────────────────────────────────────────────────
 // Audit logger captures all API requests for compliance tracking

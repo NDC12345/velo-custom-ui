@@ -122,6 +122,7 @@
 import { ref, computed, nextTick, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import aiService from '@/services/ai.service'
+import { escapeHtml, sanitizeMarkdown } from '@/utils/sanitize'
 
 const route  = useRoute()
 const router = useRouter()
@@ -175,20 +176,24 @@ onMounted(async () => {
   }
 })
 
-/** Simple markdown → HTML for panel display */
+/** Simple markdown → HTML for panel display, with HTML escaping + DOMPurify sanitisation */
 function renderMarkdown(text) {
   if (!text) return ''
-  return text
-    // Code blocks
-    .replace(/```[\w]*\n?([\s\S]*?)```/g, '<pre class="ai-code"><code>$1</code></pre>')
-    // Inline code
-    .replace(/`([^`]+)`/g, '<code class="ai-inline-code">$1</code>')
-    // Bold
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    // Italic
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    // Newlines
-    .replace(/\n/g, '<br>')
+  // Escape raw HTML FIRST so injected tags from AI output can't execute
+  const safe = escapeHtml(text)
+  return sanitizeMarkdown(
+    safe
+      // Code blocks (content is already escaped by escapeHtml above)
+      .replace(/```[\w]*\n?([\s\S]*?)```/g, '<pre class="ai-code"><code>$1</code></pre>')
+      // Inline code
+      .replace(/`([^`]+)`/g, '<code class="ai-inline-code">$1</code>')
+      // Bold
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      // Italic
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      // Newlines
+      .replace(/\n/g, '<br>')
+  )
 }
 
 async function scrollToBottom() {

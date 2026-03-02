@@ -71,6 +71,12 @@ export const useAuthStore = defineStore('auth', () => {
     return response.data
   }
 
+  /** Called by api.js when token refresh fails — clears local state so the
+   *  router guard actually redirects to /login instead of bouncing to /. */
+  function clearUser() {
+    _saveUser(null)
+  }
+
   return {
     user,
     isAuthenticated,
@@ -79,6 +85,7 @@ export const useAuthStore = defineStore('auth', () => {
     register,
     fetchCurrentUser,
     changePassword,
+    clearUser,
   }
 })
 

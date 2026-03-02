@@ -4,6 +4,10 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs').promises;
 const crypto = require('crypto');
+const logger = require('../utils/logger');
+
+// Resolve AVATARS_DIR once at startup so it never changes at runtime
+const AVATARS_DIR = path.resolve(path.join(__dirname, '../../uploads/avatars'));
 
 // Use memory storage so we can validate file contents before persisting
 const storage = multer.memoryStorage();
@@ -13,7 +17,6 @@ const upload = multer({
     limits: { fileSize: 5 * 1024 * 1024 } // 5MB
 });
 
-// Helper: detect image type from magic bytes (no extra deps)
 function detectImageType(buffer) {
     if (!buffer || buffer.length < 12) return null;
     // JPEG
@@ -25,6 +28,31 @@ function detectImageType(buffer) {
     // WebP (RIFF....WEBP)
     if (buffer.slice(0,4).toString('ascii') === 'RIFF' && buffer.slice(8,12).toString('ascii') === 'WEBP') return { mime: 'image/webp', ext: 'webp' };
     return null;
+}
+
+/**
+ * safeUnlinkAvatar — delete an avatar file referenced by its stored URL, with
+ * full protection against path-traversal attacks.
+ *
+ * Guards applied, in order:
+ *  1. Skip nulls, empty strings and data URIs.
+ *  2. Require the URL to start with the trusted prefix /uploads/avatars/.
+ *  3. Extract only the basename (strips any injected ../ segments from the URL).
+ *  4. Resolve the absolute path and verify it is strictly inside AVATARS_DIR.
+ */
+async function safeUnlinkAvatar(avatarUrl) {
+    if (!avatarUrl || typeof avatarUrl !== 'string') return;
+    if (!avatarUrl.startsWith('/uploads/avatars/')) return; // skips data URIs too
+    const safeName = path.basename(avatarUrl);              // e.g. "avatar-uuid-123.png"
+    if (!safeName || safeName === '.' || safeName === '..') return;
+    const resolved = path.resolve(AVATARS_DIR, safeName);
+    // Belt-and-suspenders: must be inside AVATARS_DIR
+    if (resolved !== AVATARS_DIR && !resolved.startsWith(AVATARS_DIR + path.sep)) return;
+    try {
+        await fs.unlink(resolved);
+    } catch (err) {
+        if (err.code !== 'ENOENT') logger.warn('Failed to delete avatar file:', { code: err.code, file: safeName });
+    }
 }
 
 /**
@@ -97,18 +125,23 @@ exports.uploadAvatar = [
             return res.status(400).json({ success: false, error: 'Invalid or unsupported image format' });
         }
 
-        const avatarsDir = path.join(__dirname, '../../uploads/avatars');
-        await fs.mkdir(avatarsDir, { recursive: true });
+        await fs.mkdir(AVATARS_DIR, { recursive: true });
 
         // Safe filename: include user id and timestamp
         const filename = `avatar-${userId}-${Date.now()}.${imgType.ext}`;
-        const outPath = path.join(avatarsDir, filename);
+        const outPath = path.join(AVATARS_DIR, filename);
+
+        // Belt-and-suspenders: verify resolved path is strictly inside AVATARS_DIR
+        if (!outPath.startsWith(AVATARS_DIR + path.sep)) {
+            return res.status(400).json({ success: false, error: 'Invalid file path' });
+        }
+
+        // Get old avatar to delete BEFORE writing new one
+        const oldAvatar = await query('SELECT avatar_url FROM users WHERE id = $1', [userId]);
+        const oldUrl = oldAvatar.rows[0]?.avatar_url;
 
         // Persist file to disk
         await fs.writeFile(outPath, req.file.buffer, { flag: 'wx' });
-
-        // Get old avatar to delete
-        const oldAvatar = await query('SELECT avatar_url FROM users WHERE id = $1', [userId]);
 
         // Update database with new avatar path (serve path)
         const avatarUrl = `/uploads/avatars/${filename}`;
@@ -117,19 +150,8 @@ exports.uploadAvatar = [
             [avatarUrl, userId]
         );
 
-        // Delete old avatar file if exists and is within avatarsDir
-        const oldUrl = oldAvatar.rows[0]?.avatar_url;
-        if (oldUrl) {
-            try {
-                const candidate = path.join(__dirname, '../../', oldUrl);
-                const resolved = path.resolve(candidate);
-                if (resolved.startsWith(path.resolve(avatarsDir))) {
-                    await fs.unlink(resolved).catch(() => {});
-                }
-            } catch (e) {
-                // ignore deletion errors
-            }
-        }
+        // Delete old avatar file safely using path traversal protection
+        await safeUnlinkAvatar(oldUrl);
 
         res.json({ success: true, data: { avatarUrl } });
     })
@@ -149,17 +171,8 @@ exports.deleteAvatar = asyncHandler(async (req, res) => {
     );
     
     if (result.rows[0]?.avatar_url) {
-        // Delete file safely only if inside uploads/avatars
-        const avatarsDir = path.join(__dirname, '../../uploads/avatars');
-        const candidate = path.join(__dirname, '../../', result.rows[0].avatar_url);
-        try {
-            const resolved = path.resolve(candidate);
-            if (resolved.startsWith(path.resolve(avatarsDir))) {
-                await fs.unlink(resolved).catch(() => {});
-            }
-        } catch (e) {
-            // ignore
-        }
+        // Delete file safely using path traversal protection
+        await safeUnlinkAvatar(result.rows[0].avatar_url);
     }
     
     // Clear avatar_url in database

@@ -95,7 +95,7 @@
             <div class="login-card__icon">
               <v-icon size="22" color="#3b82f6">mdi-shield-account</v-icon>
             </div>
-            <h2 class="login-card__title">Secure Access</h2>
+            <h2 class="login-card__title">Login</h2>
             <p class="login-card__subtitle">Authenticate to enter the operations center</p>
           </div>
 
@@ -165,14 +165,6 @@
               </span>
             </button>
           </form>
-
-          <!-- Footer -->
-          <div class="login-card__footer">
-            <div class="login-card__security">
-              <v-icon size="12" color="#22d3ee">mdi-lock-check-outline</v-icon>
-              <span>AES-256 encrypted · JWT session</span>
-            </div>
-          </div>
         </div>
       </div>
     </div>

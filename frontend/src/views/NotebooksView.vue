@@ -184,7 +184,7 @@
             />
             <!-- Output -->
             <div v-if="cell.output" class="cell-output pa-3" style="border-top: 1px solid var(--border);">
-              <div v-if="cell.type === 'markdown'" v-html="cell.output" class="markdown-output"></div>
+              <div v-if="cell.type === 'markdown'" v-html="sanitizeCellOutput(cell.output)" class="markdown-output"></div>
               <div v-else>
                 <v-data-table
                   v-if="cell.outputRows && cell.outputRows.length"
@@ -271,6 +271,7 @@
 
 <script>
 import notebookService from '@/services/notebook.service'
+import { sanitizeCellOutput } from '@/utils/sanitize'
 
 export default {
   name: 'NotebooksView',
@@ -301,6 +302,8 @@ export default {
   },
 
   methods: {
+    sanitizeCellOutput,
+
     async loadNotebooks() {
       this.loading = true
       try {

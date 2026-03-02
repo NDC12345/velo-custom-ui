@@ -154,7 +154,7 @@
               <div class="text-caption font-weight-bold mb-1" style="color: var(--accent-hover);">
                 Cell {{ i + 1 }} — {{ cell.type || 'markdown' }}
               </div>
-              <div v-if="cell.output" class="cell-output" v-html="cell.output"></div>
+              <div v-if="cell.output" class="cell-output" v-html="sanitizeCellOutput(cell.output)"></div>
               <div v-else class="cell-output text-caption" style="color: var(--text-muted);">No output</div>
             </div>
             <div v-if="!notebookDetail.cell_metadata?.length" class="text-center pa-4" style="color: var(--text-muted);">
@@ -176,6 +176,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { format } from 'date-fns'
 import api from '@/services/api'
+import { sanitizeCellOutput } from '@/utils/sanitize'
 
 const loading = ref(false)
 const creating = ref(false)

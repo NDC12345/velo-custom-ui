@@ -61,7 +61,6 @@ import { ScatterplotLayer } from '@deck.gl/layers'
 import { HeatmapLayer } from '@deck.gl/aggregation-layers'
 
 import { useGeoStore } from '@/stores/useGeoStore'
-import { useWebSocket } from '@/composables/useWebSocket'
 import { darkNavyStyle, MAP_INIT } from '@/utils/mapStyle'
 import { GridLayer } from '@/utils/gridLayer'
 
@@ -74,9 +73,8 @@ import LayerControlBar from './controls/LayerControlBar.vue'
 // ── Emits ────────────────────────────────────────────────────────────────────
 const emit = defineEmits(['client-click'])
 
-// ── Store + WS ───────────────────────────────────────────────────────────────
+// ── Store ────────────────────────────────────────────────────────────────────
 const store = useGeoStore()
-const { connect, disconnect } = useWebSocket()
 
 // ── Private network detection ─────────────────────────────────────────────────
 const hasPrivateClients = computed(() => {
@@ -347,13 +345,9 @@ onMounted(async () => {
 
   // 7. FPS counter
   fpsRafId = requestAnimationFrame(measureFps)
-
-  // 8. Connect WebSocket
-  connect()
 })
 
 onUnmounted(() => {
-  disconnect()
   resizeObs?.disconnect()
   if (fpsRafId) cancelAnimationFrame(fpsRafId)
   deckOverlay.value?.finalize()

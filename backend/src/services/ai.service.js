@@ -2,6 +2,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const axios = require('axios');
 const logger = require('../utils/logger');
 const { query } = require('../config/database');
+const { validateExternalUrl } = require('../utils/ssrf');
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Provider registry – each entry describes a supported AI backend
@@ -107,6 +108,12 @@ class AIService {
       baseUrl:  config.baseUrl || '',
       model:    config.model   || '',
     };
+
+    // SSRF protection: validate user-supplied baseUrl for providers that use one
+    if (clean.baseUrl && (clean.provider === 'ollama' || clean.provider === 'custom')) {
+      validateExternalUrl(clean.baseUrl); // throws ValidationError on bad URL
+    }
+
     await query(
       `INSERT INTO user_settings (user_id, setting_key, setting_value)
        VALUES ($1, 'ai_provider', $2::jsonb)
@@ -229,6 +236,7 @@ When discussing investigations, emphasize proper forensic methodology.`;
         case 'openai':
         case 'custom': {
           const url = `${this._oaiBaseUrl(config)}/chat/completions`;
+          if (config.provider === 'custom') validateExternalUrl(this._oaiBaseUrl(config)); // SSRF guard
           const r = await axios.post(url, {
             model: config.model || PROVIDERS[config.provider]?.defaultModel || 'gpt-4o-mini',
             messages: testMsg, max_tokens: 10,
@@ -237,6 +245,7 @@ When discussing investigations, emphasize proper forensic methodology.`;
         }
         case 'ollama': {
           const base = config.baseUrl || 'http://localhost:11434';
+          validateExternalUrl(base); // SSRF guard
           const r = await axios.post(`${base}/api/chat`, {
             model: config.model || 'llama3.2', messages: testMsg, stream: false,
           }, { timeout: 30000 });
@@ -254,11 +263,13 @@ When discussing investigations, emphasize proper forensic methodology.`;
     try {
       if (config.provider === 'ollama') {
         const base = config.baseUrl || 'http://localhost:11434';
+        validateExternalUrl(base); // SSRF guard
         const r = await axios.get(`${base}/api/tags`, { timeout: 10000 });
         return (r.data.models || []).map(m => m.name);
       }
       if (config.provider === 'openrouter' || config.provider === 'openai' || config.provider === 'custom') {
         const url = `${this._oaiBaseUrl(config)}/models`;
+        if (config.provider === 'custom') validateExternalUrl(this._oaiBaseUrl(config)); // SSRF guard
         const r = await axios.get(url, { headers: this._oaiHeaders(config), timeout: 10000 });
         return (r.data.data || []).map(m => m.id).sort();
       }

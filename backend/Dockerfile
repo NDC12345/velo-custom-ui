@@ -42,8 +42,8 @@ COPY --from=build --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=build --chown=nodejs:nodejs /app/src ./src
 COPY --from=build --chown=nodejs:nodejs /app/package*.json ./
 
-# Create logs and uploads directories
-RUN mkdir -p logs uploads/avatars && chown nodejs:nodejs logs uploads
+# Create logs and uploads directories with proper ownership (recursive)
+RUN mkdir -p logs uploads/avatars && chown -R nodejs:nodejs logs uploads
 
 USER nodejs
 

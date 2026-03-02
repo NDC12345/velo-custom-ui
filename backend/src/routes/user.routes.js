@@ -5,8 +5,10 @@ const fs = require('fs').promises;
 const { authenticateJWT } = require('../middleware/auth');
 const { query } = require('../config/database');
 const logger = require('../utils/logger');
-const { testCredentials } = require('../config/velo-api');
+const { testCredentials, invalidateSession } = require('../config/velo-api');
 const { getVeloCredentials } = require('../services/auth.service');
+
+const { validateExternalUrl } = require('../utils/ssrf');
 
 const router = express.Router();
 
@@ -39,41 +41,14 @@ async function safeUnlinkAvatar(avatarUrl) {
   }
 }
 
-// Configure multer for avatar upload
-const storage = multer.diskStorage({
-  destination: async (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '../../uploads/avatars');
-    try {
-      await fs.mkdir(uploadDir, { recursive: true });
-      cb(null, uploadDir);
-    } catch (error) {
-      logger.error('Failed to create upload directory:', error);
-      cb(error);
-    }
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(file.originalname);
-    cb(null, `avatar-${req.user.userId}-${uniqueSuffix}${ext}`);
-  }
-});
-
+// ── Multer: memory storage (magic-byte validation happens after upload) ───────
+// Using memoryStorage for BOTH upload routes so the raw buffer can be
+// inspected before anything touches disk.  diskStorage with
+// path.extname(file.originalname) is a path-traversal vector because the
+// original filename is fully attacker-controlled.
 const upload = multer({
-  storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB max
-  },
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|webp/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-
-    if (mimetype && extname) {
-      return cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed (jpeg, jpg, png, gif, webp)'));
-    }
-  }
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB max
 });
 
 // All user routes require authentication
@@ -112,126 +87,131 @@ router.get('/profile', async (req, res) => {
 
 /**
  * POST /api/user/avatar
- * Upload user avatar
+ * Upload user avatar via multipart/form-data.
+ * Uses memory storage so the raw buffer can be validated via magic bytes
+ * before anything is written to disk — prevents content-type spoofing.
  */
 router.post('/avatar', upload.single('avatar'), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        error: 'No file uploaded'
-      });
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ success: false, error: 'No file uploaded' });
     }
 
-    const avatarUrl = `/uploads/avatars/${req.file.filename}`;
+    // Validate magic bytes — reject anything that doesn't look like a real image
+    const imgType = detectMagicType(req.file.buffer);
+    if (!imgType) {
+      return res.status(400).json({ success: false, error: 'Invalid image data. Unrecognised image format.' });
+    }
 
-    // Delete old avatar if exists
-    const oldAvatar = await query(
-      'SELECT avatar_url FROM users WHERE id = $1',
-      [req.user.userId]
-    );
+    // Ensure directory exists (uses module-level AVATARS_DIR constant)
+    await fs.mkdir(AVATARS_DIR, { recursive: true });
 
-    // safeUnlinkAvatar validates path is inside AVATARS_DIR before unlinking
-    await safeUnlinkAvatar(oldAvatar.rows[0]?.avatar_url);
+    // Build a safe filename — extension derived from magic bytes, NOT the original filename
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const filename = `avatar-${req.user.userId}-${uniqueSuffix}.${imgType.ext}`;
+    const outPath  = path.join(AVATARS_DIR, filename);
 
-    // Update user avatar URL
-    await query(
-      'UPDATE users SET avatar_url = $1 WHERE id = $2',
-      [avatarUrl, req.user.userId]
-    );
+    // Belt-and-suspenders: verify resolved path is strictly inside AVATARS_DIR
+    if (!outPath.startsWith(AVATARS_DIR + path.sep)) {
+      return res.status(400).json({ success: false, error: 'Invalid file path' });
+    }
 
-    logger.info(`Avatar updated for user ${req.user.userId}`);
+    // Delete the old avatar (if it exists on disk) before writing the new one
+    const oldRow = await query('SELECT avatar_url FROM users WHERE id = $1', [req.user.userId]);
+    await safeUnlinkAvatar(oldRow.rows[0]?.avatar_url);
 
-    res.json({
-      success: true,
-      data: {
-        avatarUrl
-      }
-    });
+    // Write decoded image to disk (exclusive flag prevents overwriting)
+    await fs.writeFile(outPath, req.file.buffer, { flag: 'wx' });
+
+    // Persist only the serve-path in the database
+    const avatarUrl = `/uploads/avatars/${filename}`;
+    await query('UPDATE users SET avatar_url = $1 WHERE id = $2', [avatarUrl, req.user.userId]);
+
+    logger.info(`Avatar (multipart) updated for user ${req.user.userId}`);
+    res.json({ success: true, data: { avatarUrl } });
   } catch (error) {
     logger.error('Avatar upload error:', error);
-    
-    // Delete uploaded file on error
-    if (req.file) {
-      try {
-        await fs.unlink(req.file.path);
-      } catch (err) {
-        logger.error('Failed to delete uploaded file:', err);
-      }
-    }
-
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Failed to upload avatar'
-    });
+    res.status(500).json({ success: false, error: error.message || 'Failed to upload avatar' });
   }
 });
 
+// ─── Magic-byte image type detector (shared by both upload routes) ───────────
+const MAGIC_TYPES = [
+  { mime: 'image/jpeg', ext: 'jpg',  check: (b) => b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF },
+  { mime: 'image/png',  ext: 'png',  check: (b) => b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47 },
+  { mime: 'image/gif',  ext: 'gif',  check: (b) => b.slice(0,6).toString('ascii') === 'GIF87a' || b.slice(0,6).toString('ascii') === 'GIF89a' },
+  { mime: 'image/webp', ext: 'webp', check: (b) => b.slice(0,4).toString('ascii') === 'RIFF' && b.slice(8,12).toString('ascii') === 'WEBP' },
+];
+
+function detectMagicType(buffer) {
+  if (!buffer || buffer.length < 12) return null;
+  return MAGIC_TYPES.find((t) => t.check(buffer)) || null;
+}
+
 /**
  * POST /api/user/avatar/base64
- * Upload user avatar as a base64 data URI in JSON body { avatarBase64: 'data:image/png;base64,...' }
+ * Upload user avatar sent as a base64 data URI in JSON body { avatarBase64: 'data:image/png;base64,...' }
+ * The image is decoded, validated via magic bytes, and saved to disk.
+ * Only the file path (e.g. /uploads/avatars/avatar-<id>-<ts>.png) is stored in the database.
  */
 router.post('/avatar/base64', async (req, res) => {
   try {
-    let { avatarBase64, mimeType } = req.body;
+    const { avatarBase64 } = req.body;
 
     if (!avatarBase64 || typeof avatarBase64 !== 'string') {
       return res.status(400).json({ success: false, error: 'Missing avatarBase64 field' });
     }
 
-    // Accept either full data URI (data:image/..;base64,...) or raw base64 string.
-    let base64Data = null;
-    let detectedMime = null;
-
-    if (avatarBase64.startsWith('data:')) {
-      const match = avatarBase64.match(/^data:image\/(png|jpeg|jpg|gif|webp);base64,([A-Za-z0-9+/=\n\r]+)$/);
-      if (!match) {
-        return res.status(400).json({ success: false, error: 'Invalid data URI. Expect data:image/{png|jpeg|jpg|gif|webp};base64,...' });
-      }
-      detectedMime = `image/${match[1] === 'jpg' ? 'jpeg' : match[1]}`;
-      base64Data = match[2].replace(/\s+/g, '');
-    } else {
-      // Raw base64 string — allow optional mimeType override, otherwise try to use provided mimeType or default to image/png
-      base64Data = avatarBase64.replace(/\s+/g, '');
-      if (mimeType && typeof mimeType === 'string') {
-        detectedMime = mimeType;
-      } else if (req.body.mime && typeof req.body.mime === 'string') {
-        detectedMime = req.body.mime;
-      } else {
-        detectedMime = 'image/png';
-      }
-      // Basic validation of mime
-      const allowedMimes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
-      if (!allowedMimes.includes(detectedMime)) {
-        return res.status(400).json({ success: false, error: 'Unsupported mime type' });
-      }
+    // Accept only full data URIs: data:image/{type};base64,<data>
+    const match = avatarBase64.match(/^data:image\/(png|jpeg|jpg|gif|webp);base64,([A-Za-z0-9+/=\s]+)$/);
+    if (!match) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid data URI. Expected: data:image/{png|jpeg|jpg|gif|webp};base64,...',
+      });
     }
 
-    // Validate base64 characters
-    if (!/^[A-Za-z0-9+/=]+$/.test(base64Data)) {
-      return res.status(400).json({ success: false, error: 'Invalid base64 payload' });
-    }
+    const base64Data = match[2].replace(/\s+/g, '');
 
+    // Decode to raw buffer
     const buffer = Buffer.from(base64Data, 'base64');
-    const MAX_BYTES = 5 * 1024 * 1024; // 5MB
-
+    const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
     if (buffer.length > MAX_BYTES) {
-      return res.status(413).json({ success: false, error: 'Image too large. Max 5MB allowed.' });
+      return res.status(413).json({ success: false, error: 'Image too large. Max 5 MB allowed.' });
     }
 
-    // Delete old avatar file if it was stored on disk
-    const oldAvatar = await query('SELECT avatar_url FROM users WHERE id = $1', [req.user.userId]);
-    const oldUrl = oldAvatar.rows[0]?.avatar_url;
-    // safeUnlinkAvatar validates path is inside AVATARS_DIR before unlinking
-    await safeUnlinkAvatar(oldUrl);
+    // Verify magic bytes — reject anything that doesn't look like a real image
+    const imgType = detectMagicType(buffer);
+    if (!imgType) {
+      return res.status(400).json({ success: false, error: 'Invalid image data. Unrecognised image format.' });
+    }
 
-    // Compose data URI using detected mime and cleaned base64
-    const dataUri = `data:${detectedMime};base64,${base64Data}`;
+    // Ensure the uploads/avatars directory exists (uses module-level AVATARS_DIR constant)
+    await fs.mkdir(AVATARS_DIR, { recursive: true });
 
-    // Store data URI directly in avatar_url column
-    await query('UPDATE users SET avatar_url = $1 WHERE id = $2', [dataUri, req.user.userId]);
+    // Build a safe, unique filename
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const filename = `avatar-${req.user.userId}-${uniqueSuffix}.${imgType.ext}`;
+    const outPath  = path.join(AVATARS_DIR, filename);
 
-    res.json({ success: true, data: { avatarUrl: dataUri } });
+    // Belt-and-suspenders: verify resolved path is strictly inside AVATARS_DIR
+    if (!outPath.startsWith(AVATARS_DIR + path.sep)) {
+      return res.status(400).json({ success: false, error: 'Invalid file path' });
+    }
+
+    // Delete the old avatar (if it exists on disk) before writing the new one
+    const oldRow = await query('SELECT avatar_url FROM users WHERE id = $1', [req.user.userId]);
+    await safeUnlinkAvatar(oldRow.rows[0]?.avatar_url);
+
+    // Write decoded image to disk (exclusive flag prevents overwriting)
+    await fs.writeFile(outPath, buffer, { flag: 'wx' });
+
+    // Persist only the serve-path (not the giant data URI) in the database
+    const avatarUrl = `/uploads/avatars/${filename}`;
+    await query('UPDATE users SET avatar_url = $1 WHERE id = $2', [avatarUrl, req.user.userId]);
+
+    logger.info(`Avatar (base64) updated for user ${req.user.userId}`);
+    res.json({ success: true, data: { avatarUrl } });
   } catch (error) {
     logger.error('Avatar base64 upload error:', error);
     res.status(500).json({ success: false, error: 'Failed to upload avatar' });
@@ -372,12 +352,29 @@ router.put('/velo-connection', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Invalid server URL. Must start with http:// or https://' });
     }
 
+    // SSRF protection: reject cloud-metadata and link-local targets
+    try {
+      validateExternalUrl(serverUrl);
+    } catch (ssrfErr) {
+      return res.status(400).json({ success: false, error: ssrfErr.message });
+    }
+
     const normalizedUrl = serverUrl.replace(/\/$/, '');
+
+    // Capture existing credentials/server URL so we can invalidate any cached
+    // sessions after updating the saved URL. This prevents stale CSRF/session
+    // data from being used for subsequent proxied requests.
+    let prevCreds = null;
+    try {
+      prevCreds = await getVeloCredentials(req.user.userId);
+    } catch (_) {
+      prevCreds = null;
+    }
 
     if (testFirst) {
       // Verify current credentials work against the new server URL
       try {
-        const creds = await getVeloCredentials(req.user.userId);
+        const creds = prevCreds || await getVeloCredentials(req.user.userId);
         await testCredentials(creds.username, creds.password, normalizedUrl, verifySsl);
       } catch (testErr) {
         return res.status(400).json({
@@ -391,6 +388,21 @@ router.put('/velo-connection', async (req, res) => {
       'UPDATE users SET velo_server_url = $1, velo_verify_ssl = $2, updated_at = NOW() WHERE id = $3',
       [normalizedUrl, verifySsl, req.user.userId]
     );
+
+    // Invalidate any cached sessions for the previous and new server URLs so
+    // the next proxied request will re-obtain CSRF cookies/tokens.
+    try {
+      const credsToInvalidate = prevCreds || await getVeloCredentials(req.user.userId);
+      if (credsToInvalidate && credsToInvalidate.username) {
+        // prev URL (may be empty)
+        const prevUrl = prevCreds?.serverUrl || '';
+        try { invalidateSession({ username: credsToInvalidate.username, password: credsToInvalidate.password }, '', prevUrl); } catch (e) { /* non-fatal */ }
+        // new URL
+        try { invalidateSession({ username: credsToInvalidate.username, password: credsToInvalidate.password }, '', normalizedUrl); } catch (e) { /* non-fatal */ }
+      }
+    } catch (e) {
+      logger.warn('Failed to invalidate Velo session cache after settings change', { userId: req.user.userId, err: e?.message });
+    }
 
     logger.info('Velo connection updated', { userId: req.user.userId, serverUrl: normalizedUrl });
     res.json({

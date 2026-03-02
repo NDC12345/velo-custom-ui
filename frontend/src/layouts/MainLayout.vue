@@ -128,7 +128,8 @@
           <!-- User -->
           <div class="user-menu" @click.stop="showUserMenu = !showUserMenu">
             <v-avatar size="26" rounded="lg" color="#1c2438">
-              <span style="font-size: 11px; font-weight: 700; color: #60a5fa;">
+              <v-img v-if="userAvatarUrl" :src="userAvatarUrl" :alt="user?.username" />
+              <span v-else style="font-size: 11px; font-weight: 700; color: #60a5fa;">
                 {{ (user?.username || 'U')[0].toUpperCase() }}
               </span>
             </v-avatar>
@@ -173,7 +174,9 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useThemeStore } from '@/stores/theme'
 import { useGeoStore } from '@/stores/useGeoStore'
+import { useWebSocket } from '@/composables/useWebSocket'
 import AskAIButton from '@/components/AskAIButton.vue'
+import userService from '@/services/user.service'
 
 const router = useRouter()
 const route  = useRoute()
@@ -182,8 +185,13 @@ const authStore = useAuthStore()
 const collapsed = ref(false)
 const showUserMenu = ref(false)
 const user = computed(() => authStore.user)
+const userAvatarUrl = computed(() => userService.getAvatarUrl(user.value?.avatar_url))
 const themeStore = useThemeStore()
 const geoStore   = useGeoStore()
+
+// Global WebSocket — lives for the full session, survives route navigation.
+// MapContainer no longer manages its own WS connection.
+const { connect: wsConnect } = useWebSocket()
 
 const navGroups = [
   {
@@ -258,10 +266,17 @@ async function handleLogout() {
   router.push('/login')
 }
 
-onMounted(() => {
+onMounted(async () => {
   if (!user.value) {
     authStore.fetchCurrentUser().catch(() => router.push('/login'))
   }
+  // Seed geo store via HTTP immediately so topbar counts and map show data
+  // before the WebSocket delivers its first snapshot (can take up to 10s).
+  geoStore.fetchSnapshot()
+  // Start the persistent WebSocket for real-time geo updates.
+  // useWebSocket's onUnmounted(disconnect) fires only when MainLayout itself
+  // unmounts (i.e., on logout), so the connection stays alive across routes.
+  wsConnect()
 })
 </script>
 

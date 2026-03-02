@@ -130,7 +130,7 @@ async function login(credentials) {
                 velo_password_encrypted, velo_password_iv, velo_password_auth_tag,
                 velo_roles, velo_org_id, current_access_jti,
                 velo_server_url, velo_verify_ssl,
-                failed_login_attempts, locked_until
+                failed_login_attempts, locked_until, avatar_url
          FROM users WHERE username = $1 AND deleted_at IS NULL`,
         [username]
     );
@@ -248,7 +248,7 @@ async function login(credentials) {
     logger.info('User logged in', { username, orgId });
 
     return {
-        user:   { id: user.id, username: user.username, email: user.email, roles: user.roles },
+        user:   { id: user.id, username: user.username, email: user.email, roles: user.roles, avatar_url: user.avatar_url || null },
         accessToken,
         refreshToken,
         veloRoles,
@@ -425,6 +425,52 @@ async function cleanExpiredRevocations() {
     logger.debug('Cleaned expired JTI revocations', { deleted: result.rowCount });
 }
 
+// ── Admin: create local user ───────────────────────────────────────────────────
+
+/**
+ * Create a matching PostgreSQL record for a user that an admin created in
+ * Velociraptor via /api/v1/CreateUser.  The user's first successful login will
+ * re-sync and overwrite the stored encrypted credentials automatically.
+ *
+ * Returns the new user row, or null if the user already exists (idempotent).
+ */
+async function createLocalUser({ username, password, veloRoles = [], orgId = '', serverUrl = '', verifySsl = true }) {
+    if (!username) return null;
+
+    const existing = await query(
+        'SELECT id FROM users WHERE username = $1 AND deleted_at IS NULL',
+        [username]
+    );
+    if (existing.rows.length > 0) {
+        logger.info('createLocalUser: user already exists in PostgreSQL, skipping', { username });
+        return null;
+    }
+
+    const encUn = encryptCredential(username);
+    const encPw = encryptCredential(password || '');
+
+    const result = await query(
+        `INSERT INTO users (
+            username, email,
+            velo_username_encrypted, velo_username_iv, velo_username_auth_tag,
+            velo_password_encrypted, velo_password_iv, velo_password_auth_tag,
+            velo_roles, velo_org_id, velo_roles_synced_at,
+            velo_server_url, velo_verify_ssl
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), $11, $12)
+        RETURNING id, username`,
+        [
+            username, '',  // email is empty for admin-created users
+            Buffer.from(encUn.encrypted, 'hex'), encUn.iv, encUn.authTag,
+            Buffer.from(encPw.encrypted, 'hex'), encPw.iv, encPw.authTag,
+            veloRoles, orgId,
+            serverUrl || null, verifySsl,
+        ]
+    );
+
+    logger.info('createLocalUser: local PostgreSQL record created by admin', { username });
+    return result.rows[0];
+}
+
 module.exports = {
     register,
     login,
@@ -434,4 +480,5 @@ module.exports = {
     getVeloCredentials,
     changeVeloPassword,
     cleanExpiredRevocations,
+    createLocalUser,
 };

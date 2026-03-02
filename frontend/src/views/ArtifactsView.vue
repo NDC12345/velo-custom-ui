@@ -35,7 +35,6 @@
           :headers="headers"
           :items="filteredArtifacts"
           :loading="loading"
-          :search="search"
           hover
           density="compact"
           class="modern-table"
@@ -175,12 +174,20 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import artifactService from '@/services/artifact.service'
 
 const loading = ref(false)
 const search = ref('')
+const debouncedSearch = ref('')
 const typeFilter = ref('')
+
+// Debounce search input — avoid recomputing filteredArtifacts on every keystroke
+let _searchTimer = null
+watch(search, (val) => {
+  clearTimeout(_searchTimer)
+  _searchTimer = setTimeout(() => { debouncedSearch.value = val }, 300)
+})
 const artifacts = ref([])
 const selectedArtifact = ref(null)
 const detailDialog = ref(false)
@@ -201,8 +208,18 @@ const headers = [
 ]
 
 const filteredArtifacts = computed(() => {
-  if (!typeFilter.value) return artifacts.value
-  return artifacts.value.filter(a => a.type === typeFilter.value)
+  let list = artifacts.value
+  if (typeFilter.value) {
+    list = list.filter(a => a.type === typeFilter.value)
+  }
+  const q = debouncedSearch.value.trim().toLowerCase()
+  if (q) {
+    list = list.filter(a =>
+      (a.name || '').toLowerCase().includes(q) ||
+      (a.description || '').toLowerCase().includes(q)
+    )
+  }
+  return list
 })
 
 const getTypeIcon = (type) => ({

@@ -349,6 +349,7 @@ import { useAuthStore } from '@/stores/auth'
 import aiService from '@/services/ai.service'
 import userService from '@/services/user.service'
 import clientService from '@/services/client.service'
+import { sanitizeMarkdown } from '@/utils/sanitize'
 
 const router = useRouter()
 const route = useRoute()
@@ -635,20 +636,24 @@ const formatMessage = (text) => {
 
   const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-  const fmtText = (s) => s
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
-    .replace(/^### (.+)$/gm, '<h3 class="msg-h">$1</h3>')
-    .replace(/^## (.+)$/gm, '<h3 class="msg-h">$1</h3>')
-    .replace(/^# (.+)$/gm, '<h3 class="msg-h">$1</h3>')
-    .replace(/^[-*] (.+)$/gm, '<li class="msg-li">$1</li>')
-    .replace(/\n/g, '<br>')
+  const fmtText = (s) => {
+    // Escape HTML FIRST to prevent injection through bold/italic/heading content
+    const safe = esc(s)
+    return safe
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
+      .replace(/^### (.+)$/gm, '<h3 class="msg-h">$1</h3>')
+      .replace(/^## (.+)$/gm, '<h3 class="msg-h">$1</h3>')
+      .replace(/^# (.+)$/gm, '<h3 class="msg-h">$1</h3>')
+      .replace(/^[-*] (.+)$/gm, '<li class="msg-li">$1</li>')
+      .replace(/\n/g, '<br>')
+  }
 
-  return parts.map((p, i) => {
+  const raw = parts.map((p, i) => {
     if (p.type === 'text') return fmtText(p.content)
     const blockId = `vcb_${Date.now()}_${i}`
-    const lang = p.lang || 'code'
+    const lang = esc(p.lang || 'code')
     return `<div class="msg-code-block" id="${blockId}">
   <div class="msg-code-header">
     <span class="msg-code-lang">${lang}</span>
@@ -657,6 +662,8 @@ const formatMessage = (text) => {
   <pre class="msg-code-pre"><code>${esc(p.content.trimEnd())}</code></pre>
 </div>`
   }).join('')
+
+  return sanitizeMarkdown(raw)
 }
 
 const copyCode = (code) => {

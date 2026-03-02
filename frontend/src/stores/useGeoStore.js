@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed, shallowRef } from 'vue'
 import Supercluster from 'supercluster'
+import api from '@/services/api'
 
 // ── Private network fallback ──────────────────────────────────────────────────
 // Clients with RFC1918 / unresolvable IPs are placed here with deterministic jitter
@@ -136,6 +137,23 @@ export const useGeoStore = defineStore('geo', () => {
   function bumpSeq(n) { seqNo.value = n }
 
   /**
+   * HTTP fallback — fetch geo snapshot via REST when WS is unavailable.
+   * Silently ignored on error so it never blocks UI startup.
+   */
+  async function fetchSnapshot() {
+    try {
+      const { data } = await api.get('/api/geo/clients')
+      const clients = data?.clients || data || []
+      if (Array.isArray(clients) && clients.length > 0) {
+        applySnapshot(clients)
+      }
+    } catch (err) {
+      // Non-fatal — WS will eventually provide data
+      console.warn('[GeoStore] HTTP snapshot fetch failed:', err?.message)
+    }
+  }
+
+  /**
    * Get clusters for current viewport
    * @param {[west, south, east, north]} bbox
    * @param {number} zoom
@@ -206,6 +224,7 @@ export const useGeoStore = defineStore('geo', () => {
     setWsStatus,
     setFps,
     bumpSeq,
+    fetchSnapshot,
     getClusters,
     getClusterExpansionZoom,
     getClusterLeaves,

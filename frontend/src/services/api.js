@@ -1,5 +1,6 @@
 import axios from 'axios'
 import router from '@/router'
+import { useAuthStore } from '@/stores/auth'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -19,7 +20,7 @@ const api = axios.create({
   // Empty string = relative URL → nginx on port 80/3000 proxies /api to backend.
   // Set VITE_API_URL in .env only if you need an explicit host (e.g. http://localhost:5000 for dev outside docker).
   baseURL: import.meta.env.VITE_API_URL ?? '',
-  timeout: 8000,
+  timeout: 30000,   // 30s — Velociraptor proxy calls can be slow (initial session + artifact listing)
   withCredentials: true,               // send / receive HttpOnly cookies on every request
   headers: {
     'Content-Type': 'application/json',
@@ -50,7 +51,12 @@ let isRefreshing = false
 let refreshSubscribers = []
 
 function onRefreshed() {
-  refreshSubscribers.forEach((cb) => cb())
+  refreshSubscribers.forEach(({ resolve }) => resolve())
+  refreshSubscribers = []
+}
+
+function onRefreshFailed(err) {
+  refreshSubscribers.forEach(({ reject }) => reject(err))
   refreshSubscribers = []
 }
 
@@ -64,10 +70,11 @@ api.interceptors.response.use(
 
     if (error.response?.status === 401 && !originalRequest._retry && !isAuthRoute) {
       if (isRefreshing) {
-        // Queue the request until refresh completes
+        // Queue the request until refresh completes (or fails)
         return new Promise((resolve, reject) => {
-          refreshSubscribers.push(() => {
-            resolve(api(originalRequest))
+          refreshSubscribers.push({
+            resolve: () => resolve(api(originalRequest)),
+            reject,
           })
         })
       }
@@ -87,8 +94,10 @@ api.interceptors.response.use(
         onRefreshed()
         return api(originalRequest)
       } catch (refreshError) {
-        refreshSubscribers = []
-        // Redirect to login; auth store will clean up user state
+        onRefreshFailed(refreshError)
+        // Clear user state FIRST so the router guard redirects to /login
+        // instead of bouncing back to / (auth loop with blank screen).
+        try { useAuthStore().clearUser() } catch (_) {}
         router.push('/login')
         return Promise.reject(refreshError)
       } finally {

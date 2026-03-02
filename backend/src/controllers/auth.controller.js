@@ -130,7 +130,7 @@ exports.me = asyncHandler(async (req, res) => {
     const result = await dbQuery(
         `SELECT id, username, email, roles, velo_roles, velo_org_id,
                 velo_server_url, velo_verify_ssl,
-                theme, timezone, language, created_at, last_login_at
+                theme, timezone, language, avatar_url, created_at, last_login_at
          FROM users WHERE id = $1`,
         [req.user.userId]
     );

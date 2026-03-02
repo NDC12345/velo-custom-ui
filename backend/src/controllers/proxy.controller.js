@@ -15,6 +15,8 @@
 const veloApi = require('../config/velo-api');
 const { asyncHandler } = require('../middleware/errorHandler');
 const { VeloApiError } = require('../utils/errors');
+const { createLocalUser } = require('../services/auth.service');
+const logger = require('../utils/logger');
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  HELPERS
@@ -1503,6 +1505,26 @@ exports.setUser = asyncHandler(async (req, res) => {
                 data: { name: data.name, org: req.veloOrgId || '', roles: data.roles },
             });
         } catch (_) { /* non-fatal */ }
+    }
+    // Also create the user in PostgreSQL so they can log into this app.
+    // The login flow authenticates against Velociraptor then looks up the user
+    // in PostgreSQL — without a local record the new user cannot log in.
+    if (data.add_new_user && data.name) {
+        try {
+            await createLocalUser({
+                username:   data.name,
+                password:   data.password,
+                veloRoles:  data.roles || [],
+                orgId:      req.veloOrgId || '',
+                serverUrl:  req.veloServerUrl || '',
+            });
+        } catch (localErr) {
+            // Non-fatal: Velo user created successfully; log the local failure but
+            // don't reject the request (user can still register via the login page).
+            logger.warn('setUser: failed to create local PostgreSQL record', {
+                username: data.name, error: localErr.message,
+            });
+        }
     }
     res.json(response || { success: true, name: data.name });
 });
