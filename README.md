@@ -1,6 +1,6 @@
 # VeLo Custom UI
 
-A production-ready, dark-theme SOC dashboard built as a custom frontend for [Velociraptor](https://docs.velociraptor.app/) — the open-source digital forensics and incident response (DFIR) platform. This project adds a modern cybersecurity-oriented UI on top of the Velociraptor REST/gRPC-gateway API.
+A production-ready, dark-theme SOC dashboard built as a custom frontend for [Velociraptor](https://docs.velociraptor.app/) — the open-source digital forensics and incident response (DFIR) platform. This project adds a modern cybersecurity-oriented UI on top of the Velociraptor /gRPC-gateway API.
 
 ---
 
@@ -37,7 +37,7 @@ A production-ready, dark-theme SOC dashboard built as a custom frontend for [Vel
 | Service     | Technology         | Purpose                                     |
 |-------------|-------------------|---------------------------------------------|
 | Frontend    | Vue 3 + Vite + ECharts + Vuetify 3 | SPA served by Nginx |
-| Backend     | Node.js 18 + Express            | REST API proxy to Velociraptor + auth |
+| Backend     | Node.js 18 + Express            |  API proxy to Velociraptor + auth |
 | PostgreSQL  | Postgres 15        | Users, sessions, cases, audit log           |
 | Redis       | Redis 7            | GeoIP lookup cache + WebSocket pub/sub      |
 | Velociraptor| External (yours)   | DFIR data source — clients, hunts, VFS      |
@@ -50,7 +50,7 @@ A production-ready, dark-theme SOC dashboard built as a custom frontend for [Vel
 |---------------|----------|-------------------------------------------|
 | Docker        | 24+      | Install from https://docs.docker.com      |
 | Docker Compose| v2.20+   | Bundled with Docker Desktop               |
-| Velociraptor  | 0.7.x+   | Running with the REST API enabled         |
+| Velociraptor  | 0.7.x+   | Running with the  API enabled         |
 | (optional) MaxMind account | — | For offline GeoIP lookups |
 
 Your Velociraptor server must be reachable from the machine running this stack. If it is on a private network, use an SSH tunnel or a Cloudflare/ngrok tunnel.
@@ -62,7 +62,7 @@ Your Velociraptor server must be reachable from the machine running this stack. 
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/your-org/velo-custom-ui.git
+git clone https://github.com/NDC12345/velo-custom-ui.git
 cd velo-custom-ui
 
 # Copy the environment template and fill in values
@@ -121,7 +121,7 @@ Open `http://localhost:3000`, log in with the admin credentials you just created
 
 ## Velociraptor API Setup
 
-### Enable the REST/gRPC-gateway
+### Enable the /gRPC-gateway
 
 The backend communicates with Velociraptor via its built-in HTTP API (port `8889` by default). Ensure this is enabled in your Velociraptor server config:
 
@@ -132,7 +132,7 @@ API:
   bind_port: 8080      # gRPC port
 GUI:
   bind_address: 0.0.0.0
-  bind_port: 8889      # REST/HTTP gateway
+  bind_port: 8889      # /HTTP gateway
   gw_certificate: ...  # TLS cert
   gw_private_key: ...  # TLS key
 ```
@@ -439,8 +439,6 @@ Reduce `JWT_ACCESS_EXPIRES_IN` claims are too short or clocks are out of sync. C
 
 ---
 
-## License
 
-This project is proprietary software. All rights reserved. Redistribution or commercial use without a valid license agreement is prohibited.
 
 For licensing inquiries contact: **your-email@company.com**
