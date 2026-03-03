@@ -34,9 +34,9 @@
       <!-- Metadata cards -->
       <v-row class="mb-4">
         <v-col v-for="item in metadataItems" :key="item.label" cols="6" md="3">
-          <div class="glass-panel pa-4">
+          <div class="glass-panel pa-3">
             <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">{{ item.label }}</div>
-            <div style="font-size: 14px; color: var(--text-primary); font-weight: 600;">{{ item.value }}</div>
+            <div style="font-size: 13px; color: var(--text-primary); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" :title="item.value">{{ item.value }}</div>
           </div>
         </v-col>
       </v-row>
@@ -133,12 +133,25 @@ const snackbar = ref({ show: false, text: '', color: 'success' })
 const flowId = computed(() => route.params.flowId)
 const clientId = computed(() => route.query.client_id || flow.value.client_id)
 
-const metadataItems = computed(() => [
-  { label: 'Flow ID', value: flow.value.session_id || '—' },
-  { label: 'Client', value: flow.value.client_id || clientId.value || '—' },
-  { label: 'Artifact', value: (flow.value.artifacts_with_results || flow.value.request?.artifacts)?.[0] || '—' },
-  { label: 'Created', value: formatDate(flow.value.create_time) },
-])
+const metadataItems = computed(() => {
+  const startMs = flow.value.start_time
+  const endMs = flow.value.active_time
+  let duration = '—'
+  if (startMs && endMs && endMs > startMs) {
+    const s = Math.round((endMs - startMs) / (endMs > 1e12 ? 1e6 : 1))
+    duration = s < 60 ? `${s}s` : `${Math.floor(s/60)}m ${s%60}s`
+  }
+  return [
+    { label: 'Flow ID', value: flow.value.session_id || '—' },
+    { label: 'Client', value: flow.value.client_id || clientId.value || '—' },
+    { label: 'Artifact', value: (flow.value.artifacts_with_results || flow.value.request?.artifacts)?.[0] || '—' },
+    { label: 'State', value: flow.value.state || 'Unknown' },
+    { label: 'Created', value: formatDate(flow.value.create_time) },
+    { label: 'Started', value: flow.value.start_time ? formatDate(flow.value.start_time) : '—' },
+    { label: 'Completed', value: flow.value.active_time ? formatDate(flow.value.active_time) : '—' },
+    { label: 'Duration', value: duration },
+  ]
+})
 
 function formatDate(ts) {
   if (!ts) return '—'
@@ -177,19 +190,11 @@ async function loadFlowResults() {
   try {
     const res = await flowService.getFlowResults(clientId.value, flowId.value, artifacts[0])
     const data = res.data || res
-    const rows = data.rows || []
-    const columns = data.columns || []
-    if (columns.length) {
-      resultHeaders.value = columns.map(c => ({ title: c, key: c, sortable: true }))
-      resultRows.value = rows.map(row => {
-        const obj = {}
-        columns.forEach((c, i) => { obj[c] = row.cell?.[i] || row[c] || '' })
-        return obj
-      })
-    } else if (rows.length) {
-      const keys = Object.keys(rows[0])
+    const items = data.items || data.data?.items || []
+    if (items.length) {
+      const keys = Object.keys(items[0])
       resultHeaders.value = keys.map(k => ({ title: k, key: k, sortable: true }))
-      resultRows.value = rows
+      resultRows.value = items
     }
   } catch (e) {
     console.error('Load flow results failed:', e)

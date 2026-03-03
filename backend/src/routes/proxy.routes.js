@@ -1,6 +1,31 @@
 ﻿const express = require('express');
+const multer = require('multer');
 const proxyController = require('../controllers/proxy.controller');
 const { authenticateJWT } = require('../middleware/auth');
+
+// Memory-storage multer for tool binary uploads (max 100 MB)
+const toolUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
+
+/**
+ * Wraps a multer middleware and returns a proper 400/413 JSON response on
+ * MulterError instead of crashing the asyncHandler chain.
+ */
+function safeSingleUpload(multerMiddleware) {
+    return (req, res, next) => {
+        multerMiddleware(req, res, (err) => {
+            if (err) {
+                if (err.code === 'LIMIT_FILE_SIZE') {
+                    return res.status(413).json({ error: 'File too large. Maximum allowed size is 100 MB.' });
+                }
+                if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+                    return res.status(400).json({ error: 'Unexpected form field. Expected a single file field named \'file\'.' });
+                }
+                return res.status(400).json({ error: 'File upload error: ' + (err.message || 'Unknown error') });
+            }
+            next();
+        });
+    };
+}
 const { injectVeloCredentials } = require('../middleware/veloCredentials');
 const {
     requireReader,
@@ -174,13 +199,15 @@ router.get('/completions',              requireReader,                          
 router.post('/vql/reformat',            requireReader,                                   proxyController.reformatVQL);
 
 //  TOOLS â”€
-// reader+: list tools
+// reader+: list tools, get single tool
 // analyst+: set/upload
 // admin: delete
 
 router.get('/tools',                    requireReader,                                   proxyController.getTools);
+router.get('/tools/:toolName',          requireReader,                                   proxyController.getToolInfo);
 router.post('/tools',                   requireAnalyst,                                  proxyController.setToolInfo);
-router.post('/uploads/tool',            requireAnalyst,                                  proxyController.uploadTool);
+router.delete('/tools/:toolName',       requireAdmin,                                    proxyController.deleteTool);
+router.post('/uploads/tool',            requireAnalyst,  safeSingleUpload(toolUpload.single('file')), proxyController.uploadTool);
 router.post('/uploads/file',            requireAnalyst,                                  proxyController.uploadFormFile);
 
 //  SECRETS 

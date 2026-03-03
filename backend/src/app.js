@@ -74,7 +74,10 @@ app.use(morgan('combined', {
 }));
 
 // ─── Body / cookie parsing ────────────────────────────────────────────────────
-app.use(express.json({ limit: '10mb' }));
+// 75 MB limit on JSON bodies to accommodate base64-encoded artifact packs
+// (~50 MB ZIP = ~67 MB base64 = within margin).  All other routes are still
+// protected by their own input-size guards in the controller layer.
+app.use(express.json({ limit: '75mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // cookieParser must come before CSRF middleware

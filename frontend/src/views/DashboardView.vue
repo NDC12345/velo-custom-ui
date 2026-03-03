@@ -31,127 +31,155 @@
       <div class="kpi-row">
 
         <!-- Clients -->
-        <div class="kpi-card fade-in" style="--d:.06s;--kc:#22c55e" @click="$router.push('/clients')">
-          <div class="kpi-card__accent-bar"></div>
-          <div class="kpi-card__body">
-            <div class="kpi-card__head">
-              <span class="kpi-card__badge-icon" style="--bi:#22c55e">
-                <v-icon size="13" color="#22c55e">mdi-account-multiple</v-icon>
-              </span>
-              <span class="kpi-card__title">CLIENTS</span>
-              <span class="kpi-live-dot"></span>
+        <div class="kc fade-in" style="--d:.05s;--kc:#22c55e;--kc-dim:rgba(34,197,94,.08)" @click="$router.push('/clients')">
+          <div class="kc__mesh"></div>
+          <div class="kc__top-line"></div>
+          <div class="kc__hdr">
+            <span class="kc__icon" style="--kc:#22c55e"><v-icon size="15" color="#22c55e">mdi-account-multiple</v-icon></span>
+            <span class="kc__label">ENDPOINTS</span>
+            <span class="kc__live-chip"><span class="kc__live-dot"></span>LIVE</span>
+          </div>
+          <div class="kc__body">
+            <div class="kc__num-wrap">
+              <span class="kc__num">{{ totalClientCount }}</span>
+              <span class="kc__unit">total</span>
             </div>
-            <div class="kpi-card__hero">
-              <svg class="kpi-ring" viewBox="0 0 56 56" aria-hidden="true">
-                <circle cx="28" cy="28" r="24" fill="none" class="kpi-ring__bg" stroke-width="3"/>
-                <circle cx="28" cy="28" r="24" fill="none" class="kpi-ring__arc"
-                  :style="{stroke:'var(--kc)', strokeDasharray: totalClientCount ? (onlineClientCount/totalClientCount*150.8).toFixed(1)+' 150.8' : '0 150.8'}"
-                  stroke-width="3" transform="rotate(-90 28 28)" stroke-linecap="round"/>
-              </svg>
-              <div class="kpi-card__num-col">
-                <span class="kpi-card__val">{{ totalClientCount }}</span>
-                <span class="kpi-card__unit">total</span>
-              </div>
-            </div>
-            <div class="kpi-card__foot">
-              <span class="kpi-status kpi-status--on"><span class="kpi-dot"></span>{{ onlineClientCount }} online</span>
-              <span class="kpi-card__sub">{{ totalClientCount - onlineClientCount }} offline</span>
+            <div class="kc__spark">
+              <div v-for="(v,i) in spClients" :key="i" class="kc__bar"
+                :style="{height: spClientsMax ? Math.max(8,(v/spClientsMax*100))+'%' : '8%', background: 'color-mix(in srgb, #22c55e '+(50+i*3)+'%, transparent)'}"></div>
             </div>
           </div>
-          <div class="kpi-card__track"><div class="kpi-card__fill" :style="{width: totalClientCount ? (onlineClientCount/totalClientCount*100)+'%':'0%'}"></div></div>
+          <div class="kc__divider"></div>
+          <div class="kc__foot">
+            <div class="kc__stat">
+              <span class="kc__stat-val" style="color:#22c55e">{{ onlineClientCount }}</span>
+              <span class="kc__stat-lbl">Online</span>
+            </div>
+            <div class="kc__stat-sep"></div>
+            <div class="kc__stat">
+              <span class="kc__stat-val">{{ totalClientCount - onlineClientCount }}</span>
+              <span class="kc__stat-lbl">Offline</span>
+            </div>
+            <div class="kc__stat-sep"></div>
+            <div class="kc__stat">
+              <span class="kc__stat-val" style="color:#38bdf8">{{ displayStats.activeDay }}</span>
+              <span class="kc__stat-lbl">Active 24h</span>
+            </div>
+          </div>
+          <div class="kc__prog"><div class="kc__prog-fill" :style="{width: totalClientCount ? (onlineClientCount/totalClientCount*100)+'%':'0%'}"></div></div>
         </div>
 
         <!-- Hunts -->
-        <div class="kpi-card fade-in" style="--d:.10s;--kc:#f97316" @click="$router.push('/hunts')">
-          <div class="kpi-card__accent-bar"></div>
-          <div class="kpi-card__body">
-            <div class="kpi-card__head">
-              <span class="kpi-card__badge-icon" style="--bi:#f97316">
-                <v-icon size="13" color="#f97316">mdi-folder-search</v-icon>
-              </span>
-              <span class="kpi-card__title">HUNTS</span>
+        <div class="kc fade-in" style="--d:.09s;--kc:#f97316;--kc-dim:rgba(249,115,22,.08)" @click="$router.push('/hunts')">
+          <div class="kc__mesh"></div>
+          <div class="kc__top-line"></div>
+          <div class="kc__hdr">
+            <span class="kc__icon" style="--kc:#f97316"><v-icon size="15" color="#f97316">mdi-folder-search</v-icon></span>
+            <span class="kc__label">HUNTS</span>
+            <span v-if="displayStats.runningHunts > 0" class="kc__run-chip"><span class="kc__run-dot"></span>{{ displayStats.runningHunts }} RUNNING</span>
+          </div>
+          <div class="kc__body">
+            <div class="kc__num-wrap">
+              <span class="kc__num">{{ displayStats.totalHunts }}</span>
+              <span class="kc__unit">total</span>
             </div>
-            <div class="kpi-card__hero">
-              <svg class="kpi-ring" viewBox="0 0 56 56" aria-hidden="true">
-                <circle cx="28" cy="28" r="24" fill="none" class="kpi-ring__bg" stroke-width="3"/>
-                <circle cx="28" cy="28" r="24" fill="none" class="kpi-ring__arc"
-                  :style="{stroke:'var(--kc)', strokeDasharray: displayStats.totalHunts ? (displayStats.runningHunts/displayStats.totalHunts*150.8).toFixed(1)+' 150.8' : '0 150.8'}"
-                  stroke-width="3" transform="rotate(-90 28 28)" stroke-linecap="round"/>
-              </svg>
-              <div class="kpi-card__num-col">
-                <span class="kpi-card__val">{{ displayStats.totalHunts }}</span>
-                <span class="kpi-card__unit">total</span>
-              </div>
-            </div>
-            <div class="kpi-card__foot">
-              <span class="kpi-status kpi-status--run"><span class="kpi-dot"></span>{{ displayStats.runningHunts }} running</span>
-              <span class="kpi-card__sub">{{ displayStats.completedHunts }} done</span>
+            <div class="kc__spark">
+              <div v-for="(v,i) in spHunts" :key="i" class="kc__bar"
+                :style="{height: spHuntsMax ? Math.max(8,(v/spHuntsMax*100))+'%' : '8%', background: 'color-mix(in srgb, #f97316 '+(50+i*3)+'%, transparent)'}"></div>
             </div>
           </div>
-          <div class="kpi-card__track"><div class="kpi-card__fill" :style="{width: displayStats.totalHunts ? (displayStats.runningHunts/displayStats.totalHunts*100)+'%':'0%'}"></div></div>
+          <div class="kc__divider"></div>
+          <div class="kc__foot">
+            <div class="kc__stat">
+              <span class="kc__stat-val" style="color:#22c55e">{{ displayStats.completedHunts }}</span>
+              <span class="kc__stat-lbl">Completed</span>
+            </div>
+            <div class="kc__stat-sep"></div>
+            <div class="kc__stat">
+              <span class="kc__stat-val" style="color:#f97316">{{ displayStats.runningHunts }}</span>
+              <span class="kc__stat-lbl">Running</span>
+            </div>
+            <div class="kc__stat-sep"></div>
+            <div class="kc__stat">
+              <span class="kc__stat-val" style="color:#ef4444">{{ huntErrorCount }}</span>
+              <span class="kc__stat-lbl">Errors</span>
+            </div>
+          </div>
+          <div class="kc__prog"><div class="kc__prog-fill" :style="{width: displayStats.totalHunts ? (displayStats.completedHunts/displayStats.totalHunts*100)+'%':'0%'}"></div></div>
         </div>
 
         <!-- Events -->
-        <div class="kpi-card fade-in" style="--d:.14s;--kc:#a78bfa" @click="$router.push('/events')">
-          <div class="kpi-card__accent-bar"></div>
-          <div class="kpi-card__body">
-            <div class="kpi-card__head">
-              <span class="kpi-card__badge-icon" style="--bi:#a78bfa">
-                <v-icon size="13" color="#a78bfa">mdi-pulse</v-icon>
-              </span>
-              <span class="kpi-card__title">EVENTS</span>
+        <div class="kc fade-in" style="--d:.13s;--kc:#a78bfa;--kc-dim:rgba(167,139,250,.08)" @click="$router.push('/events')">
+          <div class="kc__mesh"></div>
+          <div class="kc__top-line"></div>
+          <div class="kc__hdr">
+            <span class="kc__icon" style="--kc:#a78bfa"><v-icon size="15" color="#a78bfa">mdi-pulse</v-icon></span>
+            <span class="kc__label">EVENTS</span>
+          </div>
+          <div class="kc__body">
+            <div class="kc__num-wrap">
+              <span class="kc__num">{{ fmtN(displayStats.totalEvents) }}</span>
+              <span class="kc__unit">collected</span>
             </div>
-            <div class="kpi-card__hero">
-              <svg class="kpi-ring" viewBox="0 0 56 56" aria-hidden="true">
-                <circle cx="28" cy="28" r="24" fill="none" class="kpi-ring__bg" stroke-width="3"/>
-                <circle cx="28" cy="28" r="24" fill="none" class="kpi-ring__arc"
-                  :style="{stroke:'var(--kc)', strokeDasharray:'150.8 150.8'}"
-                  stroke-width="3" transform="rotate(-90 28 28)" stroke-linecap="round"/>
-              </svg>
-              <div class="kpi-card__num-col">
-                <span class="kpi-card__val">{{ fmtN(displayStats.totalEvents) }}</span>
-                <span class="kpi-card__unit">collected</span>
-              </div>
-            </div>
-            <div class="kpi-card__foot">
-              <span class="kpi-status kpi-status--info"><span class="kpi-dot"></span>all time</span>
-              <span class="kpi-card__sub">from Velo API</span>
+            <div class="kc__spark">
+              <div v-for="(v,i) in spEvents" :key="i" class="kc__bar"
+                :style="{height: spEventsMax ? Math.max(8,(v/spEventsMax*100))+'%' : '8%', background: 'color-mix(in srgb, #a78bfa '+(50+i*3)+'%, transparent)'}"></div>
             </div>
           </div>
-          <div class="kpi-card__track"><div class="kpi-card__fill" style="width:100%"></div></div>
+          <div class="kc__divider"></div>
+          <div class="kc__foot">
+            <div class="kc__stat">
+              <span class="kc__stat-val" style="color:#a78bfa">{{ fmtN(displayStats.totalEvents) }}</span>
+              <span class="kc__stat-lbl">All Time</span>
+            </div>
+            <div class="kc__stat-sep"></div>
+            <div class="kc__stat">
+              <span class="kc__stat-val">API</span>
+              <span class="kc__stat-lbl">Source</span>
+            </div>
+          </div>
+          <div class="kc__prog"><div class="kc__prog-fill" style="width:100%"></div></div>
         </div>
 
         <!-- Alerts -->
-        <div class="kpi-card fade-in" style="--d:.18s;--kc:#ef4444" @click="$router.push('/clients')">
-          <div class="kpi-card__accent-bar"></div>
-          <div class="kpi-card__body">
-            <div class="kpi-card__head">
-              <span class="kpi-card__badge-icon" style="--bi:#ef4444">
-                <v-icon size="13" color="#ef4444">mdi-alert-circle</v-icon>
-              </span>
-              <span class="kpi-card__title">ALERTS</span>
-              <span v-if="alertsCount > 0" class="kpi-alert-pulse"></span>
+        <div class="kc fade-in" style="--d:.17s;--kc:#ef4444;--kc-dim:rgba(239,68,68,.08)" @click="$router.push('/clients')">
+          <div class="kc__mesh"></div>
+          <div class="kc__top-line"></div>
+          <div class="kc__hdr">
+            <span class="kc__icon" style="--kc:#ef4444"><v-icon size="15" color="#ef4444">mdi-shield-alert-outline</v-icon></span>
+            <span class="kc__label">ALERTS</span>
+            <span v-if="alertsCount > 0" class="kc__alert-chip"><span class="kc__alert-dot"></span>ACTIVE</span>
+            <span v-else class="kc__ok-chip">ALL CLEAR</span>
+          </div>
+          <div class="kc__body">
+            <div class="kc__num-wrap">
+              <span class="kc__num" :style="alertsCount>0?'color:#ef4444':''">{{ alertsCount }}</span>
+              <span class="kc__unit">{{ alertsCount > 0 ? 'incidents' : 'none' }}</span>
             </div>
-            <div class="kpi-card__hero">
-              <svg class="kpi-ring" viewBox="0 0 56 56" aria-hidden="true">
-                <circle cx="28" cy="28" r="24" fill="none" class="kpi-ring__bg" stroke-width="3"/>
-                <circle cx="28" cy="28" r="24" fill="none" class="kpi-ring__arc"
-                  :style="{stroke:'var(--kc)', strokeDasharray: alertsCount > 0 ? '150.8 150.8' : '6 150.8'}"
-                  stroke-width="3" transform="rotate(-90 28 28)" stroke-linecap="round"/>
-              </svg>
-              <div class="kpi-card__num-col">
-                <span class="kpi-card__val" :style="alertsCount > 0 ? 'color:#ef4444' : ''">{{ alertsCount }}</span>
-                <span class="kpi-card__unit">{{ alertsCount > 0 ? 'active' : 'clear' }}</span>
-              </div>
-            </div>
-            <div class="kpi-card__foot">
-              <span class="kpi-status" :class="alertsCount > 0 ? 'kpi-status--crit' : 'kpi-status--ok'">
-                <span class="kpi-dot"></span>{{ alertsCount > 0 ? 'incidents' : 'all clear' }}
-              </span>
-              <span class="kpi-card__sub">{{ huntErrorCount }} errors</span>
+            <!-- Threat bar instead of sparkline for alerts -->
+            <div class="kc__threat-vis">
+              <div v-for="n in 8" :key="n" class="kc__threat-seg"
+                :style="{opacity: n <= Math.min(alertsCount, 8) ? 1 : 0.12, background: alertsCount===0?'#22c55e':'#ef4444'}"></div>
             </div>
           </div>
-          <div class="kpi-card__track"><div class="kpi-card__fill" :style="{width: alertsCount > 0 ? '100%':'4%'}"></div></div>
+          <div class="kc__divider"></div>
+          <div class="kc__foot">
+            <div class="kc__stat">
+              <span class="kc__stat-val" :style="{color: huntErrorCount>0?'#ef4444':'var(--dt5)'}">{{ huntErrorCount }}</span>
+              <span class="kc__stat-lbl">Hunt Errors</span>
+            </div>
+            <div class="kc__stat-sep"></div>
+            <div class="kc__stat">
+              <span class="kc__stat-val" :style="{color: alertsCount>0?'#ef4444':'#22c55e'}">{{ alertsCount > 0 ? 'HIGH' : 'LOW' }}</span>
+              <span class="kc__stat-lbl">Risk Level</span>
+            </div>
+            <div class="kc__stat-sep"></div>
+            <div class="kc__stat">
+              <span class="kc__stat-val">{{ totalClientCount - onlineClientCount }}</span>
+              <span class="kc__stat-lbl">Offline</span>
+            </div>
+          </div>
+          <div class="kc__prog"><div class="kc__prog-fill" :style="{width: alertsCount > 0 ? '100%':'3%', background:'#ef4444'}"></div></div>
         </div>
 
       </div>
@@ -159,117 +187,206 @@
       <!-- ROW 2: INSIGHT PANELS -->
       <div class="ins-row">
 
-        <!-- High-Risk Clients panel -->
-        <div class="ins-card fade-in" style="--d:.22s;--ic:#ef4444">
-          <div class="ins-hdr">
-            <span class="ins-hdr__icon"><v-icon size="13" color="#ef4444">mdi-shield-alert</v-icon></span>
-            <span class="ins-hdr__title">High-Risk Clients</span>
-            <span class="ins-hdr__badge" style="--bc:#ef4444">{{ riskyClientsList.length }}</span>
-            <router-link to="/clients" class="ins-hdr__link">View →</router-link>
-          </div>
-          <div class="ins-chart-wrap">
-            <DoughnutChart
-              :labels="['Online','Offline']"
-              :data="riskDonutData"
-              :colors="['#22c55e','#ef4444']"
-              centerLabel="Clients"
-              cutout="72%"
-            />
-            <div class="ins-chart-kpis">
-              <div class="ins-kpi">
-                <span class="ins-kpi__val" style="color:#22c55e">{{ onlineClientCount }}</span>
-                <span class="ins-kpi__lbl">Online</span>
-              </div>
-              <div class="ins-kpi-sep"></div>
-              <div class="ins-kpi">
-                <span class="ins-kpi__val" style="color:#ef4444">{{ totalClientCount - onlineClientCount }}</span>
-                <span class="ins-kpi__lbl">Offline</span>
-              </div>
+        <!-- Endpoint Status -->
+        <div class="ipanel fade-in" style="--d:.21s;--ip:#ef4444">
+          <div class="ipanel__hdr">
+            <div class="ipanel__hdr-left">
+              <span class="ipanel__sev-bar" style="background:#ef4444"></span>
+              <span class="ipanel__icon"><v-icon size="14" color="#ef4444">mdi-shield-alert</v-icon></span>
+              <span class="ipanel__title">Endpoint Status</span>
+            </div>
+            <div class="ipanel__hdr-right">
+              <span class="ipanel__count" style="--ip:#ef4444">{{ riskyClientsList.length }}</span>
+              <router-link to="/clients" class="ipanel__link">View all</router-link>
             </div>
           </div>
-          <div class="ins-list">
-            <div v-if="!riskyClientsList.length" class="ins-empty">
-              <v-icon size="14" color="#22c55e">mdi-check-circle</v-icon> All endpoints online
+
+          <!-- Big stats row -->
+          <div class="ipanel__stats">
+            <div class="ipanel__stat-box" style="--sb:#22c55e">
+              <span class="ipanel__sb-num">{{ onlineClientCount }}</span>
+              <span class="ipanel__sb-lbl">Online</span>
+              <div class="ipanel__sb-bar"><div class="ipanel__sb-fill" :style="{width: totalClientCount?(onlineClientCount/totalClientCount*100)+'%':'0%', background:'#22c55e'}"></div></div>
             </div>
-            <div v-for="c in riskyClientsList" :key="c.client_id"
-              class="ins-item" @click="openClient(c)">
-              <span class="ins-item__dot"></span>
-              <span class="ins-item__name">{{ c.os_info?.hostname || c.client_id?.slice(-12) }}</span>
-              <span class="ins-item__os">{{ c.os_info?.system || c.os_info?.platform || '?' }}</span>
-              <span class="ins-item__tag ins-tag--crit">Offline</span>
+            <div class="ipanel__stat-box" style="--sb:#94a3b8">
+              <span class="ipanel__sb-num">{{ totalClientCount - onlineClientCount }}</span>
+              <span class="ipanel__sb-lbl">Offline</span>
+              <div class="ipanel__sb-bar"><div class="ipanel__sb-fill" :style="{width: totalClientCount?((totalClientCount-onlineClientCount)/totalClientCount*100)+'%':'0%', background:'#94a3b8'}"></div></div>
+            </div>
+            <div class="ipanel__stat-box" style="--sb:#38bdf8">
+              <span class="ipanel__sb-num">{{ displayStats.activeDay }}</span>
+              <span class="ipanel__sb-lbl">Active 24h</span>
+              <div class="ipanel__sb-bar"><div class="ipanel__sb-fill" :style="{width: totalClientCount?(displayStats.activeDay/totalClientCount*100)+'%':'0%', background:'#38bdf8'}"></div></div>
+            </div>
+          </div>
+
+          <!-- Offline client list -->
+          <div class="ipanel__list">
+            <div v-if="!riskyClientsList.length" class="ipanel__empty">
+              <v-icon size="13" color="#22c55e">mdi-check-circle</v-icon>
+              <span>All endpoints are online</span>
+            </div>
+            <div v-for="c in riskyClientsList" :key="c.client_id" class="ipanel__row" @click="openClient(c)">
+              <span class="ipanel__row-dot" style="background:#ef4444"></span>
+              <div class="ipanel__row-info">
+                <span class="ipanel__row-name">{{ c.os_info?.hostname || c.client_id?.slice(-12) }}</span>
+                <span class="ipanel__row-meta">{{ c.os_info?.system || c.os_info?.platform || 'Unknown OS' }}</span>
+              </div>
+              <span class="ipanel__sev-tag" style="--st:#ef4444;--st-bg:rgba(239,68,68,.12)">OFFLINE</span>
             </div>
           </div>
         </div>
 
-        <!-- Alerts panel -->
-        <div class="ins-card fade-in" style="--d:.26s;--ic:#f97316">
-          <div class="ins-hdr">
-            <span class="ins-hdr__icon"><v-icon size="13" color="#f97316">mdi-alert-decagram</v-icon></span>
-            <span class="ins-hdr__title">Alerts</span>
-            <span class="ins-hdr__badge" style="--bc:#f97316">{{ huntCoverageData[2] }}</span>
-            <router-link to="/hunts" class="ins-hdr__link">View →</router-link>
-          </div>
-          <div class="ins-chart-wrap">
-            <DoughnutChart
-              :labels="['With Results','No Results','Errors']"
-              :data="huntCoverageData"
-              :colors="['#22c55e','#94a3b8','#ef4444']"
-              centerLabel="Coverage"
-              cutout="72%"
-            />
-            <div class="ins-chart-kpis">
-              <div class="ins-kpi">
-                <span class="ins-kpi__val" style="color:#22c55e">{{ huntCoverageData[0] }}</span>
-                <span class="ins-kpi__lbl">Results</span>
-              </div>
-              <div class="ins-kpi-sep"></div>
-              <div class="ins-kpi">
-                <span class="ins-kpi__val" style="color:#ef4444">{{ huntCoverageData[2] }}</span>
-                <span class="ins-kpi__lbl">Errors</span>
-              </div>
+        <!-- Hunt Coverage -->
+        <div class="ipanel fade-in" style="--d:.25s;--ip:#f97316">
+          <div class="ipanel__hdr">
+            <div class="ipanel__hdr-left">
+              <span class="ipanel__sev-bar" style="background:#f97316"></span>
+              <span class="ipanel__icon"><v-icon size="14" color="#f97316">mdi-crosshairs-gps</v-icon></span>
+              <span class="ipanel__title">Hunt Coverage</span>
+            </div>
+            <div class="ipanel__hdr-right">
+              <span class="ipanel__count" style="--ip:#f97316">{{ huntCoverageTotal }}</span>
+              <router-link to="/hunts" class="ipanel__link">View all</router-link>
             </div>
           </div>
-          <div class="ins-legend">
-            <div v-for="it in huntCoverageLegend" :key="it.l" class="ins-leg-row">
-              <span class="ins-leg-dot" :style="{background:it.c}"></span>
-              <span class="ins-leg-lbl">{{ it.l }}</span>
-              <span class="ins-leg-bar-wrap"><span class="ins-leg-bar" :style="{background:it.c, width: huntCoverageTotal ? (it.v/huntCoverageTotal*100)+'%':'0%'}"></span></span>
-              <span class="ins-leg-val" :style="{color:it.c}">{{ it.v }}</span>
+
+          <div class="ipanel__stats">
+            <div class="ipanel__stat-box" style="--sb:#22c55e">
+              <span class="ipanel__sb-num">{{ huntCoverageData[0] }}</span>
+              <span class="ipanel__sb-lbl">With Results</span>
+              <div class="ipanel__sb-bar"><div class="ipanel__sb-fill" :style="{width: huntCoverageTotal?(huntCoverageData[0]/huntCoverageTotal*100)+'%':'0%', background:'#22c55e'}"></div></div>
+            </div>
+            <div class="ipanel__stat-box" style="--sb:#94a3b8">
+              <span class="ipanel__sb-num">{{ huntCoverageData[1] }}</span>
+              <span class="ipanel__sb-lbl">No Results</span>
+              <div class="ipanel__sb-bar"><div class="ipanel__sb-fill" :style="{width: huntCoverageTotal?(huntCoverageData[1]/huntCoverageTotal*100)+'%':'0%', background:'#64748b'}"></div></div>
+            </div>
+            <div class="ipanel__stat-box" style="--sb:#ef4444">
+              <span class="ipanel__sb-num">{{ huntCoverageData[2] }}</span>
+              <span class="ipanel__sb-lbl">Errors</span>
+              <div class="ipanel__sb-bar"><div class="ipanel__sb-fill" :style="{width: huntCoverageTotal?(huntCoverageData[2]/huntCoverageTotal*100)+'%':'0%', background:'#ef4444'}"></div></div>
+            </div>
+          </div>
+
+          <!-- Coverage donut + legend -->
+          <div class="ipanel__chart-row">
+            <div class="ipanel__donut">
+              <DoughnutChart
+                :labels="['With Results','No Results','Errors']"
+                :data="huntCoverageData"
+                :colors="['#22c55e','#475569','#ef4444']"
+                centerLabel=""
+                cutout="74%"
+              />
+            </div>
+            <div class="ipanel__leg">
+              <div v-for="it in huntCoverageLegend" :key="it.l" class="ipanel__leg-row">
+                <span class="ipanel__leg-dot" :style="{background:it.c}"></span>
+                <span class="ipanel__leg-lbl">{{ it.l }}</span>
+                <span class="ipanel__leg-val" :style="{color:it.c}">{{ it.v }}</span>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Incidents panel -->
-        <div class="ins-card fade-in" style="--d:.30s;--ic:#a78bfa">
-          <div class="ins-hdr">
-            <span class="ins-hdr__icon"><v-icon size="13" color="#a78bfa">mdi-timeline-alert</v-icon></span>
-            <span class="ins-hdr__title">Incidents</span>
-            <span class="ins-hdr__badge" style="--bc:#a78bfa">{{ displayStats.runningHunts }}</span>
-            <router-link to="/hunts" class="ins-hdr__link">View →</router-link>
+        <!-- Weekly Incidents -->
+        <div class="ipanel fade-in" style="--d:.29s;--ip:#a78bfa">
+          <div class="ipanel__hdr">
+            <div class="ipanel__hdr-left">
+              <span class="ipanel__sev-bar" style="background:#a78bfa"></span>
+              <span class="ipanel__icon"><v-icon size="14" color="#a78bfa">mdi-timeline-alert</v-icon></span>
+              <span class="ipanel__title">Weekly Incidents</span>
+            </div>
+            <div class="ipanel__hdr-right">
+              <span class="ipanel__count" style="--ip:#a78bfa">{{ displayStats.runningHunts }}</span>
+              <router-link to="/hunts" class="ipanel__link">View all</router-link>
+            </div>
           </div>
-          <div class="ins-bar-area">
-            <BarChart
-              :labels="weeklyLabels"
-              :data="weeklyHuntCounts"
-              color="#a78bfa"
-              label="Hunts Created"
+
+          <div class="ipanel__stats">
+            <div class="ipanel__stat-box" style="--sb:#a78bfa">
+              <span class="ipanel__sb-num">{{ displayStats.totalHunts }}</span>
+              <span class="ipanel__sb-lbl">Total Hunts</span>
+              <div class="ipanel__sb-bar"><div class="ipanel__sb-fill" style="width:100%;background:#a78bfa"></div></div>
+            </div>
+            <div class="ipanel__stat-box" style="--sb:#22c55e">
+              <span class="ipanel__sb-num">{{ weeklyCompleted.reduce((a,b)=>a+b,0) }}</span>
+              <span class="ipanel__sb-lbl">Completed</span>
+              <div class="ipanel__sb-bar"><div class="ipanel__sb-fill" :style="{width: displayStats.totalHunts?(weeklyCompleted.reduce((a,b)=>a+b,0)/displayStats.totalHunts*100)+'%':'0%', background:'#22c55e'}"></div></div>
+            </div>
+            <div class="ipanel__stat-box" style="--sb:#f97316">
+              <span class="ipanel__sb-num">{{ displayStats.runningHunts }}</span>
+              <span class="ipanel__sb-lbl">Running</span>
+              <div class="ipanel__sb-bar"><div class="ipanel__sb-fill" :style="{width: displayStats.totalHunts?(displayStats.runningHunts/displayStats.totalHunts*100)+'%':'0%', background:'#f97316'}"></div></div>
+            </div>
+          </div>
+
+          <div class="ipanel__bar-area">
+            <BarChart :labels="weeklyLabels" :data="weeklyHuntCounts" color="#a78bfa" label="Hunts" />
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ── ROW 2b: OS DISTRIBUTION + COLLECTION TREND ──────────────── -->
+      <div class="os-trend-row">
+
+        <!-- OS Distribution -->
+        <div class="ch-card fade-in" style="--d:.22s">
+          <div class="ch-hdr">
+            <v-icon size="13" color="#38bdf8" class="mr-2">mdi-monitor</v-icon>
+            <span>OS Distribution</span>
+            <span class="ch-hdr-badge" style="--bc:#38bdf8">{{ totalClientCount }}</span>
+          </div>
+          <div class="os-dist-body">
+            <div class="os-donut-wrap">
+              <DoughnutChart
+                :labels="['Windows','Linux','macOS','Other']"
+                :data="osDonutData"
+                :colors="['#38bdf8','#f97316','#a78bfa','#94a3b8']"
+                centerLabel="OS"
+                cutout="68%"
+              />
+            </div>
+            <div class="os-legend">
+              <div v-for="(os, i) in osBreakdownFull" :key="os.name" class="os-leg-row">
+                <span class="os-leg-dot" :style="{background: os.color}"></span>
+                <v-icon size="13" :color="os.color" class="mr-1">{{ os.icon }}</v-icon>
+                <span class="os-leg-name">{{ os.name }}</span>
+                <div class="os-leg-track"><div class="os-leg-fill" :style="{width: totalClientCount ? (os.count/totalClientCount*100)+'%':'0%', background: os.color}"></div></div>
+                <span class="os-leg-cnt" :style="{color: os.color}">{{ os.count }}</span>
+                <span class="os-leg-pct">{{ totalClientCount ? (os.count/totalClientCount*100).toFixed(0)+'%' : '0%' }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Collection Trend (multi-line) -->
+        <div class="ch-card fade-in" style="--d:.24s">
+          <div class="ch-hdr">
+            <v-icon size="13" color="#a78bfa" class="mr-2">mdi-chart-line</v-icon>
+            <span>Collection Trend · 14 days</span>
+            <span class="ch-hdr-sub">clients + hunts</span>
+            <span class="ch-hdr-badge" style="--bc:#a78bfa">14d</span>
+          </div>
+          <div class="ch-body">
+            <AreaChart
+              :labels="areaLabels"
+              :datasets="collectionDatasets"
             />
           </div>
-          <div class="ins-foot-stats">
-            <div class="ins-fstat">
-              <span class="ins-fstat__val" style="color:#a78bfa">{{ displayStats.totalHunts }}</span>
-              <span class="ins-fstat__lbl">Total</span>
-            </div>
-            <div class="ins-fstat-sep"></div>
-            <div class="ins-fstat">
-              <span class="ins-fstat__val" style="color:#22c55e">{{ weeklyCompleted.reduce((a,b)=>a+b,0) }}</span>
-              <span class="ins-fstat__lbl">Completed</span>
-            </div>
-            <div class="ins-fstat-sep"></div>
-            <div class="ins-fstat">
-              <span class="ins-fstat__val" style="color:#f97316">{{ displayStats.runningHunts }}</span>
-              <span class="ins-fstat__lbl">Running</span>
-            </div>
+        </div>
+
+        <!-- Top Artifacts Used -->
+        <div class="ch-card fade-in" style="--d:.26s">
+          <div class="ch-hdr">
+            <v-icon size="13" color="#fb923c" class="mr-2">mdi-puzzle</v-icon>
+            <span>Top Artifacts</span>
+            <span class="ch-hdr-badge" style="--bc:#fb923c">{{ topArtifacts.length }}</span>
+          </div>
+          <div class="ch-body">
+            <HorizontalBarChart :labels="topArtifactLabels" :data="topArtifactData" label="Hunts" color="#fb923c" />
           </div>
         </div>
 
@@ -327,6 +444,86 @@
           </div>
         </div>
 
+      </div>
+
+      <!-- ── ROW 3d: RUNNING HUNTS PROGRESS ──────────────────────────── -->
+      <div class="rh-section fade-in" style="--d:.33s">
+        <div class="ch-card rh-card">
+          <div class="ch-hdr">
+            <v-icon size="13" color="#22c55e" class="mr-2">mdi-run-fast</v-icon>
+            <span>Running Hunts</span>
+            <span class="ch-hdr-badge" style="--bc:#22c55e">{{ runningHuntsList.length }}</span>
+            <router-link to="/hunts" class="ap-link">View all →</router-link>
+          </div>
+          <div class="rh-body">
+            <div v-if="!runningHuntsList.length" class="rh-empty">
+              <v-icon size="20" color="#22c55e" class="mb-1">mdi-check-circle-outline</v-icon>
+              <span>No hunts currently running</span>
+            </div>
+            <div v-for="h in runningHuntsList" :key="h.id" class="rh-item">
+              <div class="rh-item__head">
+                <span class="rh-item__name">{{ h.name }}</span>
+                <span class="rh-art">{{ h.artifact }}</span>
+                <span class="rh-pct" :style="{color: h.pct >= 80 ? '#22c55e' : h.pct >= 40 ? '#f97316' : '#94a3b8'}">{{ h.pct }}%</span>
+              </div>
+              <div class="rh-bar-row">
+                <div class="rh-track">
+                  <div class="rh-done"  :style="{width: h.scheduled ? (h.completed/h.scheduled*100)+'%' : '0%'}"></div>
+                  <div class="rh-error" :style="{width: h.scheduled ? (h.errors/h.scheduled*100)+'%' : '0%', marginLeft: h.scheduled ? (h.completed/h.scheduled*100)+'%' : '0%'}"></div>
+                </div>
+                <span class="rh-counts">{{ h.completed }}<span class="rh-sep">/</span>{{ h.scheduled }}</span>
+                <span v-if="h.errors > 0" class="rh-err-badge">{{ h.errors }} err</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── ROW 3e: CASES OVERVIEW ──────────────────────────────────────── -->
+      <div class="cases-section fade-in" style="--d:.34s">
+        <div class="ch-card cases-card">
+          <div class="ch-hdr">
+            <v-icon size="13" color="#38bdf8" class="mr-2">mdi-briefcase-search</v-icon>
+            <span>Cases Overview</span>
+            <span class="ch-hdr-sub">artifact × hunt results</span>
+            <span class="ch-hdr-badge" style="--bc:#38bdf8">{{ casesRows.length }} artifacts</span>
+          </div>
+          <div class="cases-wrap">
+            <table class="cases-tbl">
+              <thead>
+                <tr>
+                  <th>Artifact</th>
+                  <th>Hunts</th>
+                  <th>Clients Reached</th>
+                  <th>Results</th>
+                  <th>Errors</th>
+                  <th>Coverage</th>
+                  <th>Success Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="!casesRows.length">
+                  <td colspan="7" style="text-align:center;padding:24px;color:var(--dt7);">No hunt data available</td>
+                </tr>
+                <tr v-for="row in casesRows" :key="row.artifact" class="cases-row">
+                  <td class="cases-art">{{ row.artifact }}</td>
+                  <td class="cases-n">{{ row.hunts }}</td>
+                  <td class="cases-n">{{ row.reached }}</td>
+                  <td class="cases-n" style="color:#22c55e">{{ row.results }}</td>
+                  <td class="cases-n" :style="{color: row.errors > 0 ? '#ef4444' : 'var(--dt6)'}">{{ row.errors }}</td>
+                  <td style="width:130px;padding-right:14px">
+                    <div class="cases-bar-track">
+                      <div class="cases-bar-fill" :style="{width: row.coveragePct+'%'}"></div>
+                    </div>
+                  </td>
+                  <td class="cases-pct" :style="{color: row.successPct >= 80 ? '#22c55e' : row.successPct >= 50 ? '#f97316' : '#ef4444'}">
+                    {{ row.successPct }}%
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <!-- ── ROW 3b: HEATMAPS ──────────────────────────────────────────── -->
@@ -403,14 +600,23 @@
           </div>
           <div class="ht-wrap">
             <table class="ht">
-              <thead><tr><th>Hunt Name</th><th>Status</th><th>Targets</th><th>Results</th><th>Date</th></tr></thead>
+              <thead><tr><th>Hunt Name</th><th>Status</th><th>Artifact</th><th>Progress</th><th>Results</th><th>Errors</th><th>Date</th></tr></thead>
               <tbody>
-                <tr v-if="!huntRows.length"><td colspan="5" class="ht-empty">No hunts found</td></tr>
+                <tr v-if="!huntRows.length"><td colspan="7" class="ht-empty">No hunts found</td></tr>
                 <tr v-for="h in huntRows" :key="h.id" class="ht-row" @click="$router.push('/hunts')">
                   <td class="ht-name">{{ h.name }}</td>
                   <td><span class="ht-pill" :class="h.sc">{{ h.status }}</span></td>
-                  <td class="ht-n">{{ h.targets }}</td>
-                  <td class="ht-n">{{ h.results }}</td>
+                  <td class="ht-art">{{ h.artifact }}</td>
+                  <td class="ht-prog">
+                    <div class="ht-prog-wrap">
+                      <div class="ht-prog-track">
+                        <div class="ht-prog-fill" :style="{width: h.targets ? (h.results/h.targets*100)+'%':'0%'}"></div>
+                      </div>
+                      <span class="ht-prog-lbl">{{ h.targets ? Math.round(h.results/h.targets*100) : 0 }}%</span>
+                    </div>
+                  </td>
+                  <td class="ht-n" style="color:#22c55e">{{ h.results }}</td>
+                  <td class="ht-n" :style="{color: h.errors > 0 ? '#ef4444' : 'var(--dt6)'}">{{ h.errors }}</td>
                   <td class="ht-date">{{ h.date }}</td>
                 </tr>
               </tbody>
@@ -498,6 +704,11 @@ function animCount(k, to, dur=900) {
   }
   requestAnimationFrame(tick)
 }
+
+/* -- Sparkline max helpers ------------------------------------------- */
+const spClientsMax = computed(() => Math.max(...spClients.value, 1))
+const spHuntsMax   = computed(() => Math.max(...spHunts.value,   1))
+const spEventsMax  = computed(() => Math.max(...spEvents.value,  1))
 
 /* -- Client Overview ------------------------------ */
 const onClientClick = (client) => {
@@ -780,15 +991,72 @@ const collectionDatasets = computed(()=>{
   ]
 })
 
+/* -- OS Distribution (full breakdown for new chart) -------------------- */
+const osDonutData = computed(() => [
+  directOs.value.windows || 0,
+  directOs.value.linux   || 0,
+  directOs.value.macos   || 0,
+  directOs.value.unknown || 0,
+])
+const osBreakdownFull = computed(() => [
+  { name:'Windows', icon:'mdi-microsoft-windows', color:'#38bdf8', count: directOs.value.windows || 0 },
+  { name:'Linux',   icon:'mdi-linux',             color:'#f97316', count: directOs.value.linux   || 0 },
+  { name:'macOS',   icon:'mdi-apple',             color:'#a78bfa', count: directOs.value.macos   || 0 },
+  { name:'Other',   icon:'mdi-devices',           color:'#94a3b8', count: directOs.value.unknown || 0 },
+].filter(o => o.count > 0))
+
+/* -- Running Hunts Progress list --------------------------------------- */
+const runningHuntsList = computed(() =>
+  huntsData.value
+    .filter(h => h.state === 2 || h.state === 'RUNNING')
+    .map(h => ({
+      id:        h.hunt_id,
+      name:      (h.hunt_description || h.start_request?.artifacts?.[0] || 'Hunt').slice(0, 38),
+      artifact:  (h.artifact_name || h.start_request?.artifacts?.[0] || '').split('.').pop().slice(0, 22),
+      scheduled: h.stats?.total_clients_scheduled    || 0,
+      completed: h.stats?.total_clients_with_results || 0,
+      errors:    h.stats?.total_clients_with_errors  || 0,
+      pct:       h.stats?.total_clients_scheduled > 0
+        ? Math.round((h.stats.total_clients_with_results / h.stats.total_clients_scheduled) * 100)
+        : 0,
+    }))
+    .slice(0, 8)
+)
+
+/* -- Cases Overview (artifact × hunt results aggregated) --------------- */
+const casesRows = computed(() => {
+  const map = {}
+  for (const h of huntsData.value) {
+    const art = (h.artifact_name || h.start_request?.artifacts?.[0] || 'Unknown').split('.').pop()
+    if (!map[art]) map[art] = { artifact: art, hunts: 0, reached: 0, results: 0, errors: 0 }
+    map[art].hunts++
+    map[art].reached  += h.stats?.total_clients_scheduled    || 0
+    map[art].results  += h.stats?.total_clients_with_results || 0
+    map[art].errors   += h.stats?.total_clients_with_errors  || 0
+  }
+  return Object.values(map)
+    .sort((a, b) => b.reached - a.reached)
+    .slice(0, 10)
+    .map(r => ({
+      ...r,
+      coveragePct: r.reached > 0 ? Math.round(r.results / r.reached * 100) : 0,
+      successPct:  r.reached > 0
+        ? Math.round((r.results / Math.max(r.reached - r.errors, 1)) * 100)
+        : 0,
+    }))
+})
+
 /* -- Hunt Table ----------------------------------- */
 const huntRows = computed(()=>
-  huntsData.value.slice(0,8).map(h=>({
+  huntsData.value.slice(0,10).map(h=>({
     id:      h.hunt_id,
     name:    (h.hunt_description||h.description||'Hunt').slice(0,32),
+    artifact:(h.artifact_name||h.start_request?.artifacts?.[0]||'').split('.').pop().slice(0,18),
     status:  [2,'RUNNING'].includes(h.state)?'Active':'Completed',
     sc:      [2,'RUNNING'].includes(h.state)?'run':'done',
     targets: h.stats?.total_clients_scheduled||0,
     results: h.stats?.total_clients_with_results||0,
+    errors:  h.stats?.total_clients_with_errors||0,
     date:    h.create_time
       ? new Date(Number(h.create_time)/1000).toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'})
       : '',
@@ -1021,430 +1289,533 @@ onUnmounted(()=>{ if(timer) clearInterval(timer) })
   transition: background var(--t-normal);
 }
 
-/* ── KPI Cards Row ────────────────────────────────────────────────────────── */
+/* (old kpi-card CSS removed — replaced by .kc XDR cards) */
+
+/* ══════════════════════════════════════════════════════════════════════════
+   XDR KPI CARDS
+══════════════════════════════════════════════════════════════════════════ */
 .kpi-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
 }
 
-.kpi-card {
+/* Card shell */
+.kc {
   position: relative;
+  display: flex;
+  flex-direction: column;
   background: var(--glass-card-bg);
   border: 1px solid var(--glass-border-soft);
-  border-left: 3px solid var(--kc, var(--accent));
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  transition:
-    transform var(--t-spring),
-    box-shadow var(--t-normal),
-    border-color var(--t-normal);
-  will-change: transform, box-shadow;
+  transition: transform var(--t-spring), box-shadow var(--t-normal), border-color var(--t-normal);
+  will-change: transform;
+  min-height: 160px;
 }
-/* Corner notch accent (top-right) */
-.kpi-card::after {
-  content: '';
+
+/* Mesh grid texture — XDR feel */
+.kc__mesh {
   position: absolute;
-  top: 0; right: 0;
-  border-style: solid;
-  border-width: 0 14px 14px 0;
-  border-color: transparent color-mix(in srgb, var(--kc, var(--accent)) 20%, transparent) transparent transparent;
-  transition: border-right-color var(--t-normal);
-}
-.kpi-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0,0,0,.32), inset 0 0 0 1px color-mix(in srgb, var(--kc, var(--accent)) 18%, transparent);
-  border-left-color: var(--kc, var(--accent));
-}
-.kpi-card:hover::after {
-  border-right-color: color-mix(in srgb, var(--kc, var(--accent)) 42%, transparent);
-}
-.kpi-card:active { transform: translateY(0); }
-
-/* Top 2px accent gradient line */
-.kpi-card__accent-bar {
-  height: 2px;
-  background: linear-gradient(90deg, var(--kc, var(--accent)) 0%, transparent 80%);
-  opacity: .5;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(var(--kc-dim, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, var(--kc-dim, transparent) 1px, transparent 1px);
+  background-size: 20px 20px;
+  opacity: 0;
   transition: opacity var(--t-normal);
-  flex-shrink: 0;
 }
-.kpi-card:hover .kpi-card__accent-bar { opacity: .9; }
+.kc:hover .kc__mesh { opacity: 1; }
 
-/* Content body */
-.kpi-card__body {
-  padding: 12px 14px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
+/* Glowing top line */
+.kc__top-line {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--kc, var(--accent)), transparent 60%);
+  z-index: 1;
+  transition: opacity var(--t-normal);
+  opacity: .7;
 }
+.kc:hover .kc__top-line { opacity: 1; }
 
-/* Head row: icon badge + title + live dot */
-.kpi-card__head {
+/* Hover lift + glow */
+.kc:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--kc, var(--accent)) 30%, var(--glass-border-soft));
+  box-shadow: 0 12px 32px rgba(0,0,0,.4), 0 0 0 1px color-mix(in srgb, var(--kc, var(--accent)) 15%, transparent);
+}
+.kc:active { transform: translateY(0); }
+
+/* All direct children above mesh */
+.kc > *:not(.kc__mesh):not(.kc__top-line) { position: relative; z-index: 1; }
+
+/* Header row */
+.kc__hdr {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
+  padding: 11px 14px 4px;
 }
-.kpi-card__badge-icon {
+.kc__icon {
   display: flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px;
-  border-radius: 5px;
-  background: color-mix(in srgb, var(--bi, var(--accent)) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--bi, var(--accent)) 20%, transparent);
+  width: 28px; height: 28px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--kc, var(--accent)) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--kc, var(--accent)) 22%, transparent);
   flex-shrink: 0;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--kc, var(--accent)) 20%, transparent);
 }
-.kpi-card__title {
+.kc__label {
+  flex: 1;
   font-size: 9.5px;
   font-weight: 700;
+  letter-spacing: .16em;
   text-transform: uppercase;
-  letter-spacing: .14em;
   color: var(--dt6);
   font-family: 'JetBrains Mono', monospace;
-  flex: 1;
 }
 
-/* Number + unit row → hero (ring + num col) */
-.kpi-card__hero {
+/* Status chips in header  */
+.kc__live-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 9px; font-weight: 700; letter-spacing: .1em;
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(34,197,94,.1);
+  color: #22c55e;
+  border: 1px solid rgba(34,197,94,.18);
+}
+.kc__run-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 9px; font-weight: 700; letter-spacing: .1em;
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(249,115,22,.1);
+  color: #f97316;
+  border: 1px solid rgba(249,115,22,.18);
+}
+.kc__alert-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 7px; border-radius: 4px;
+  font-size: 9px; font-weight: 700; letter-spacing: .1em;
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(239,68,68,.12); color: #ef4444;
+  border: 1px solid rgba(239,68,68,.22);
+}
+.kc__ok-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 7px; border-radius: 4px;
+  font-size: 9px; font-weight: 700; letter-spacing: .1em;
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(34,197,94,.08); color: #22c55e;
+  border: 1px solid rgba(34,197,94,.15);
+}
+
+@keyframes kpi-live-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,.7); }
+  50%       { box-shadow: 0 0 0 3px transparent; }
+}
+.kc__live-dot {
+  width: 5px; height: 5px; border-radius: 50%; background: #22c55e;
+  animation: kpi-live-glow 2s ease-in-out infinite;
+}
+@keyframes kpi-run-pulse {
+  0%, 100% { opacity:1; } 50% { opacity:.4; }
+}
+.kc__run-dot, .kc__alert-dot {
+  width: 5px; height: 5px; border-radius: 50%; background: currentColor;
+  animation: kpi-run-pulse 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .kc__live-dot, .kc__run-dot, .kc__alert-dot { animation: none; }
+}
+
+/* Body: big number + sparkline side by side */
+.kc__body {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 0 4px;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 2px 14px 6px;
+  gap: 8px;
+  flex: 1;
 }
-.kpi-ring {
-  width: 52px; height: 52px;
-  flex-shrink: 0;
-}
-.kpi-ring__bg {
-  stroke: rgba(255,255,255,.07);
-}
-/* Light mode: ring track needs a darker stroke to be visible on white bg */
-:root[data-theme="light"] .kpi-ring__bg {
-  stroke: rgba(0,0,0,.08);
-}
-.kpi-ring__arc {
-  fill: none;
-  transition: stroke-dasharray 1.4s cubic-bezier(.22,1,.36,1);
-}
-@media (prefers-reduced-motion: reduce) { .kpi-ring__arc { transition: none; } }
-.kpi-card__num-col {
+.kc__num-wrap {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 0;
 }
-.kpi-card__val {
-  font-size: 42px;
-  font-weight: 800;
-  letter-spacing: -.04em;
+.kc__num {
+  font-size: 48px;
+  font-weight: 900;
+  letter-spacing: -.05em;
   font-family: 'JetBrains Mono', 'Consolas', monospace;
   font-variant-numeric: tabular-nums;
   line-height: 1;
   color: var(--dt1);
   transition: color var(--t-normal);
-  text-rendering: geometricPrecision;
   -webkit-font-smoothing: antialiased;
 }
-.kpi-card:hover .kpi-card__val { color: color-mix(in srgb, var(--kc, #fff) 85%, var(--dt1)); }
-.kpi-card__unit {
-  font-size: 9.5px;
+.kc:hover .kc__num { color: color-mix(in srgb, var(--kc, #fff) 80%, var(--dt1)); }
+.kc__unit {
+  font-size: 9px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--dt6);
-  font-family: 'JetBrains Mono', monospace;
-  padding-bottom: 2px;
-}
-
-/* Footer row: status pill + sub text */
-.kpi-card__foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-}
-/* Status pill (square corners for tech feel) */
-.kpi-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 9.5px;
-  font-weight: 600;
-  padding: 1px 7px;
-  border-radius: 3px;
-  letter-spacing: .04em;
-  font-family: 'JetBrains Mono', monospace;
-}
-.kpi-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
-.kpi-status--on   { background: var(--sev-low-subtle);      color: var(--sev-low);      border: 1px solid var(--sev-low-border); }
-.kpi-status--run  { background: var(--sev-high-subtle);     color: var(--sev-high);     border: 1px solid var(--sev-high-border); }
-.kpi-status--info { background: var(--sev-info-subtle);     color: var(--sev-info);     border: 1px solid var(--sev-info-border); }
-.kpi-status--crit { background: var(--sev-critical-subtle); color: var(--sev-critical); border: 1px solid var(--sev-critical-border); }
-.kpi-status--ok   { background: var(--sev-low-subtle);      color: var(--sev-low);      border: 1px solid var(--sev-low-border); }
-.kpi-card__sub {
-  font-size: 9.5px;
+  letter-spacing: .12em;
   color: var(--dt7);
   font-family: 'JetBrains Mono', monospace;
-  font-variant-numeric: tabular-nums;
+  padding-top: 2px;
 }
 
-/* Live pulsing dot (Clients) */
-@keyframes kpi-pulse {
-  0%,100% { box-shadow: 0 0 0 0 color-mix(in srgb,var(--sev-low) 60%,transparent); }
-  50%      { box-shadow: 0 0 0 3px transparent; }
-}
-.kpi-live-dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: var(--sev-low);
-  animation: kpi-pulse 2s ease-in-out infinite;
-  flex-shrink: 0;
-}
-/* Alert pulse (Alerts card) */
-@keyframes kpi-alert {
-  0%,100% { opacity:1; transform:scale(1); }
-  50%      { opacity:.4; transform:scale(1.4); }
-}
-.kpi-alert-pulse {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: var(--sev-critical);
-  animation: kpi-alert 1.1s ease-in-out infinite;
-  flex-shrink: 0;
-}
-@media (prefers-reduced-motion: reduce) {
-  .kpi-live-dot, .kpi-alert-pulse { animation: none; }
-}
-
-/* Bottom progress track */
-.kpi-card__track {
-  height: 2px;
-  background: var(--glass-border-soft);
-  overflow: hidden;
-  flex-shrink: 0;
-}
-.kpi-card__fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--kc, var(--accent)), color-mix(in srgb, var(--kc, var(--accent)) 35%, transparent));
-  opacity: .55;
-  transition: width 1.4s cubic-bezier(.22,1,.36,1);
-}
-.kpi-card:hover .kpi-card__fill { opacity: 1; }
-@media (prefers-reduced-motion: reduce) {
-  .kpi-card { transition: none; }
-  .kpi-card:hover { transform: none; }
-  .kpi-card__fill { transition: none; }
-}
-
-
-/* ── Action Panels ──────────────────────────────────────────────────────── */
-/* Insight Panels Row */
-.ins-row {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-}
-.ins-card {
-  background: var(--glass-card-bg);
-  border: 1px solid var(--glass-border-soft);
-  border-top: 2px solid var(--ic, var(--accent));
-  border-radius: 12px;
-  overflow: hidden;
+/* Sparkline bar chart */
+.kc__spark {
   display: flex;
-  flex-direction: column;
-  transition: box-shadow var(--t-normal), border-color var(--t-normal), transform var(--t-spring);
-  position: relative;
-  will-change: transform, box-shadow;
+  align-items: flex-end;
+  gap: 2px;
+  height: 48px;
+  width: 64px;
+  flex-shrink: 0;
+  padding-bottom: 2px;
 }
-/* Gradient surface overlay — adds visual depth on hover */
-.ins-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background: var(--card-gradient-dark, linear-gradient(145deg, rgba(255,255,255,.025) 0%, transparent 60%));
-  border-radius: inherit;
-  opacity: 0;
-  transition: opacity var(--t-normal);
+.kc__bar {
+  flex: 1;
+  border-radius: 2px 2px 0 0;
+  min-height: 3px;
+  transition: height .5s cubic-bezier(.22,1,.36,1);
+  opacity: .75;
 }
-.ins-card:hover::before { opacity: 1; }
-.ins-card > * { position: relative; z-index: 1; }
-.ins-card:hover {
-  border-color: var(--glass-border-hover);
-  border-top-color: var(--ic, var(--accent));
-  box-shadow: 0 8px 28px rgba(0,0,0,.3);
-  transform: translateY(-1px);
-}
-.ins-card:active { transform: translateY(0); }
-.ins-hdr {
+.kc:hover .kc__bar { opacity: 1; }
+
+/* Threat level visualizer (Alerts card alternative spark) */
+.kc__threat-vis {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 12px 8px;
-  border-bottom: 1px solid var(--sep1);
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--dt2);
-  position: relative;
-}
-.ins-hdr::after {
-  content: '';
-  position: absolute;
-  bottom: -1px; left: 12px;
-  width: 0; height: 2px;
-  background: var(--ic, var(--accent));
-  border-radius: 1px;
-  transition: width var(--t-slow);
-}
-.ins-card:hover .ins-hdr::after { width: 32px; }
-.ins-hdr__icon {
-  display: flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--ic, var(--accent)) 12%, transparent);
+  align-items: stretch;
+  gap: 3px;
+  height: 48px;
+  width: 64px;
   flex-shrink: 0;
 }
-.ins-hdr__title { flex: 1; }
-.ins-hdr__badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 7px;
+.kc__threat-seg {
+  flex: 1;
   border-radius: 3px;
-  font-size: 10px;
-  font-weight: 700;
-  font-family: 'JetBrains Mono', monospace;
-  background: color-mix(in srgb, var(--bc, var(--accent)) 14%, transparent);
-  color: var(--bc, var(--accent));
-  border: 1px solid color-mix(in srgb, var(--bc, var(--accent)) 25%, transparent);
+  transition: opacity .4s;
 }
-.ins-hdr__link {
-  font-size: 10px;
-  color: var(--dt6);
-  text-decoration: none;
-  transition: color var(--t-fast);
+
+/* Divider */
+.kc__divider {
+  height: 1px;
+  background: var(--sep1);
+  margin: 0 14px;
 }
-.ins-hdr__link:hover { color: var(--ic, var(--accent)); }
-.ins-chart-wrap {
-  display: flex;
+
+/* Footer: 3-col mini-stats */
+.kc__foot {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
   align-items: center;
-  gap: 14px;
-  padding: 10px 16px 8px;
-  flex-shrink: 0;
-  height: 130px;
+  padding: 7px 14px 10px;
+  gap: 0;
 }
-/* constrain the donut canvas within insight panels */
-.ins-chart-wrap :deep(.ecd-root)       { width: 110px; height: 110px; }
-.ins-chart-wrap :deep(.ecd-chart-wrap) { height: 110px; min-height: unset; }
-.ins-chart-wrap :deep(canvas)          { flex-shrink: 0; }
-.ins-chart-kpis {
-  flex: 1;
-  display: flex;
-  align-items: center;
-}
-.ins-kpi {
-  flex: 1;
+.kc__stat {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
 }
-.ins-kpi__val {
-  font-size: 26px;
+.kc__stat-val {
+  font-size: 17px;
   font-weight: 800;
-  letter-spacing: -.04em;
   font-family: 'JetBrains Mono', monospace;
   font-variant-numeric: tabular-nums;
+  letter-spacing: -.02em;
   line-height: 1;
+  color: var(--dt2);
 }
-.ins-kpi__lbl {
-  font-size: 9px;
+.kc__stat-lbl {
+  font-size: 8.5px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: .10em;
-  color: var(--dt6);
+  letter-spacing: .12em;
+  color: var(--dt7);
   font-family: 'JetBrains Mono', monospace;
 }
-.ins-kpi-sep { width: 1px; height: 32px; background: var(--sep1); flex-shrink: 0; }
-.ins-list { flex: 1; overflow-y: auto; padding: 0 0 6px; min-height: 0; }
-.ins-list::-webkit-scrollbar { width: 3px; }
-.ins-list::-webkit-scrollbar-thumb { background: var(--glass-border-soft); }
-.ins-empty {
-  padding: 12px 14px;
-  font-size: 11px;
-  color: var(--dt6);
+.kc__stat-sep {
+  width: 1px;
+  height: 24px;
+  background: var(--sep1);
+  flex-shrink: 0;
+}
+
+/* Bottom progress line */
+.kc__prog {
+  height: 3px;
+  background: rgba(255,255,255,.05);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+:root[data-theme="light"] .kc__prog { background: rgba(0,0,0,.06); }
+.kc__prog-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--kc, var(--accent)) 0%, color-mix(in srgb, var(--kc, var(--accent)) 40%, transparent) 100%);
+  transition: width 1.6s cubic-bezier(.22,1,.36,1);
+  opacity: .7;
+}
+.kc:hover .kc__prog-fill { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .kc { transition: none; }
+  .kc:hover { transform: none; }
+  .kc__prog-fill, .kc__bar { transition: none; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   XDR INSIGHT PANELS
+══════════════════════════════════════════════════════════════════════════ */
+.ins-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.ipanel {
+  background: var(--glass-card-bg);
+  border: 1px solid var(--glass-border-soft);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--t-spring), box-shadow var(--t-normal), border-color var(--t-normal);
+}
+.ipanel:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--ip, var(--accent)) 28%, var(--glass-border-soft));
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
+}
+.ipanel:active { transform: translateY(0); }
+
+/* Panel Header */
+.ipanel__hdr {
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  padding: 10px 14px 9px;
+  border-bottom: 1px solid var(--sep1);
+  background: color-mix(in srgb, var(--ip, var(--accent)) 5%, transparent);
+  gap: 8px;
 }
-.ins-item {
+.ipanel__hdr-left {
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 5px 12px;
-  cursor: pointer;
-  border-bottom: 1px solid var(--sep1);
-  transition: background var(--t-fast);
-}
-.ins-item:hover { background: var(--glass-border-soft); }
-.ins-item:last-child { border-bottom: none; }
-.ins-item__dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: #ef4444;
-  flex-shrink: 0;
-  box-shadow: 0 0 4px #ef444466;
-}
-.ins-item__name {
   flex: 1;
-  font-size: 11px;
-  font-weight: 500;
+  min-width: 0;
+}
+/* Left severity bar */
+.ipanel__sev-bar {
+  width: 3px;
+  height: 18px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  opacity: .85;
+}
+.ipanel__icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ip, var(--accent)) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ip, var(--accent)) 20%, transparent);
+  flex-shrink: 0;
+}
+.ipanel__title {
+  font-size: 11.5px;
+  font-weight: 700;
   color: var(--dt2);
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.ipanel__hdr-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.ipanel__count {
+  font-size: 18px;
+  font-weight: 900;
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--ip, var(--accent));
+  line-height: 1;
+}
+.ipanel__link {
+  font-size: 10px;
+  color: var(--dt6);
+  text-decoration: none;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--glass-border-soft);
+  transition: color var(--t-fast), background var(--t-fast), border-color var(--t-fast);
   white-space: nowrap;
 }
-.ins-item__os {
-  font-size: 9.5px; color: var(--dt6);
-  font-family: 'JetBrains Mono', monospace;
-  flex-shrink: 0;
-  max-width: 52px;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.ipanel__link:hover {
+  color: var(--ip, var(--accent));
+  background: color-mix(in srgb, var(--ip, var(--accent)) 10%, transparent);
+  border-color: color-mix(in srgb, var(--ip, var(--accent)) 30%, transparent);
 }
-.ins-item__tag {
-  font-size: 9px; font-weight: 700;
-  padding: 1px 6px; border-radius: 3px;
-  letter-spacing: .04em;
-  font-family: 'JetBrains Mono', monospace;
-  flex-shrink: 0;
+
+/* 3-stat boxes row */
+.ipanel__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  border-bottom: 1px solid var(--sep1);
 }
-.ins-tag--crit { background: var(--sev-critical-subtle); color: var(--sev-critical); border: 1px solid var(--sev-critical-border); }
-.ins-legend { padding: 4px 12px 10px; display: flex; flex-direction: column; gap: 6px; }
-.ins-leg-row { display: flex; align-items: center; gap: 6px; }
-.ins-leg-dot { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
-.ins-leg-lbl { font-size: 10px; color: var(--dt5); font-family: 'JetBrains Mono', monospace; flex: 1; }
-.ins-leg-bar-wrap { width: 52px; height: 4px; background: var(--glass-border-soft); border-radius: 99px; overflow: hidden; flex-shrink: 0; }
-.ins-leg-bar { display: block; height: 100%; border-radius: 99px; transition: width 1.2s cubic-bezier(.22,1,.36,1); opacity: .85; }
-.ins-leg-val { font-size: 10px; font-weight: 700; font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; min-width: 26px; text-align: right; }
-.ins-bar-area {
-  flex: 1;
-  padding: 8px 10px 0;
-  min-height: 130px;
+.ipanel__stat-box {
   display: flex;
   flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px 8px;
+  border-right: 1px solid var(--sep1);
+  transition: background var(--t-fast);
 }
-.ins-foot-stats {
+.ipanel__stat-box:last-child { border-right: none; }
+.ipanel__stat-box:hover { background: rgba(255,255,255,.03); }
+.ipanel__sb-num {
+  font-size: 24px;
+  font-weight: 900;
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.04em;
+  line-height: 1;
+  color: var(--dt1);
+}
+.ipanel__sb-lbl {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: var(--dt7);
+  font-family: 'JetBrains Mono', monospace;
+}
+.ipanel__sb-bar {
+  height: 2px;
+  background: var(--glass-border-soft);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.ipanel__sb-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 1.2s cubic-bezier(.22,1,.36,1);
+  opacity: .8;
+}
+
+/* List section */
+.ipanel__list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+.ipanel__list::-webkit-scrollbar { width: 3px; }
+.ipanel__list::-webkit-scrollbar-thumb { background: var(--glass-border-soft); border-radius: 3px; }
+.ipanel__empty {
   display: flex;
   align-items: center;
-  padding: 6px 14px 10px;
-  border-top: 1px solid var(--sep1);
+  gap: 6px;
+  padding: 14px 14px;
+  font-size: 11px;
+  color: var(--dt6);
 }
-.ins-fstat { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; }
-.ins-fstat__val { font-size: 22px; font-weight: 800; font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; line-height: 1; }
-.ins-fstat__lbl { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: .10em; color: var(--dt6); font-family: 'JetBrains Mono', monospace; }
-.ins-fstat-sep { width: 1px; height: 28px; background: var(--sep1); }
+.ipanel__row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--row-sep2);
+  cursor: pointer;
+  transition: background var(--t-fast), padding-left var(--t-fast);
+  position: relative;
+}
+.ipanel__row:hover { background: var(--bg-hover); padding-left: 18px; }
+.ipanel__row:last-child { border-bottom: none; }
+.ipanel__row-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.ipanel__row-info { flex: 1; min-width: 0; }
+.ipanel__row-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--dt2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+.ipanel__row-meta {
+  font-size: 10px;
+  color: var(--dt6);
+  font-family: 'JetBrains Mono', monospace;
+}
+.ipanel__sev-tag {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--st, #ef4444);
+  background: var(--st-bg, rgba(239,68,68,.12));
+  border: 1px solid color-mix(in srgb, var(--st, #ef4444) 25%, transparent);
+  flex-shrink: 0;
+}
+
+/* Chart row (donut + legend) */
+.ipanel__chart-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px 12px;
+  flex: 1;
+}
+.ipanel__donut {
+  width: 90px; height: 90px; flex-shrink: 0;
+}
+.ipanel__donut :deep(.ecd-root)       { width: 90px; height: 90px; }
+.ipanel__donut :deep(.ecd-chart-wrap) { height: 90px; min-height: unset; }
+.ipanel__leg {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.ipanel__leg-row { display: flex; align-items: center; gap: 7px; }
+.ipanel__leg-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.ipanel__leg-lbl { flex: 1; font-size: 11px; color: var(--dt4); }
+.ipanel__leg-val {
+  font-size: 15px;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Bar chart area */
+.ipanel__bar-area {
+  flex: 1;
+  padding: 6px 10px 8px;
+  min-height: 110px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ipanel, .kc { transition: none; }
+  .ipanel:hover, .kc:hover { transform: none; }
+}
+
+/* (old ins-card CSS removed — replaced by .ipanel XDR panels) */
+/* ── Action Panels ──────────────────────────────────────────────────────── */
 .ap-card {
   background: var(--glass-card-bg);
   border: 1px solid var(--glass-border-soft);
@@ -2046,11 +2417,250 @@ onUnmounted(()=>{ if(timer) clearInterval(timer) })
 .t-dot.on  { background: var(--sev-low); }
 .t-dot.off { background: var(--dt7); }
 
+/* ── OS + Collection Trend row ──────────────────────────────────────────── */
+.os-trend-row {
+  display: grid;
+  grid-template-columns: 300px 1fr 260px;
+  gap: 10px;
+}
+.os-dist-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px 12px;
+  flex: 1;
+}
+.os-donut-wrap {
+  width: 110px;
+  height: 110px;
+  flex-shrink: 0;
+}
+.os-donut-wrap :deep(.ecd-root)       { width: 110px; height: 110px; }
+.os-donut-wrap :deep(.ecd-chart-wrap) { height: 110px; min-height: unset; }
+.os-legend {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.os-leg-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.os-leg-dot  { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
+.os-leg-name { font-size: 11px; color: var(--dt4); min-width: 50px; }
+.os-leg-track {
+  flex: 1;
+  height: 4px;
+  border-radius: 99px;
+  background: var(--glass-border-soft);
+  overflow: hidden;
+}
+.os-leg-fill  { height: 100%; border-radius: 99px; transition: width 1.2s cubic-bezier(.22,1,.36,1); opacity: .85; }
+.os-leg-cnt  { font-size: 12px; font-weight: 700; font-family: 'JetBrains Mono', monospace; min-width: 28px; text-align: right; }
+.os-leg-pct  { font-size: 10px; color: var(--dt6); font-family: 'JetBrains Mono', monospace; min-width: 32px; text-align: right; }
+
+/* ── Running Hunts Progress ─────────────────────────────────────────────── */
+.rh-section  { display: grid; grid-template-columns: 1fr; }
+.rh-card     {}
+.rh-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+  padding: 10px 14px 14px;
+}
+.rh-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  font-size: 12px;
+  color: var(--dt6);
+  gap: 4px;
+}
+.rh-item {
+  background: var(--bg-elevated);
+  border: 1px solid var(--glass-border-soft);
+  border-radius: 10px;
+  padding: 10px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.rh-item:hover { border-color: var(--glass-border-hover); box-shadow: 0 3px 12px rgba(0,0,0,.2); }
+.rh-item__head { display: flex; align-items: baseline; gap: 5px; }
+.rh-item__name {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dt2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rh-art {
+  font-size: 10px;
+  color: var(--dt6);
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--glass-border-soft);
+  padding: 1px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rh-pct {
+  font-size: 14px;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  min-width: 40px;
+  text-align: right;
+}
+.rh-bar-row { display: flex; align-items: center; gap: 8px; }
+.rh-track {
+  flex: 1;
+  height: 7px;
+  border-radius: 99px;
+  background: var(--glass-border-soft);
+  overflow: visible;
+  position: relative;
+}
+.rh-done {
+  position: absolute;
+  left: 0; top: 0;
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #15803d, #22c55e);
+  transition: width 1.2s cubic-bezier(.22,1,.36,1);
+}
+.rh-error {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 99px;
+  background: #ef4444;
+  transition: width 1.2s cubic-bezier(.22,1,.36,1), margin-left 1.2s cubic-bezier(.22,1,.36,1);
+}
+.rh-counts {
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--dt5);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.rh-sep { color: var(--dt7); margin: 0 1px; }
+.rh-err-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--sev-critical-subtle);
+  color: var(--sev-critical);
+  border: 1px solid var(--sev-critical-border);
+  font-family: 'JetBrains Mono', monospace;
+  flex-shrink: 0;
+}
+
+/* ── Cases Overview ─────────────────────────────────────────────────────── */
+.cases-section { display: grid; grid-template-columns: 1fr; }
+.cases-card {}
+.cases-wrap { overflow-x: auto; }
+.cases-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.cases-tbl thead { position: sticky; top: 0; z-index: 2; }
+.cases-tbl th {
+  padding: 7px 12px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .09em;
+  color: var(--dt6);
+  text-align: left;
+  border-bottom: 1px solid var(--sep1);
+  background: var(--table-head-bg);
+  white-space: nowrap;
+}
+.cases-tbl td { padding: 6px 12px; border-bottom: 1px solid var(--row-sep); color: var(--dt3); }
+.cases-row { cursor: default; transition: background var(--t-fast); }
+.cases-row:hover td { background: var(--row-hover-bg) !important; }
+.cases-art {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dt2);
+  font-family: 'JetBrains Mono', monospace;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cases-n {
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.cases-bar-track {
+  height: 5px;
+  border-radius: 99px;
+  background: var(--glass-border-soft);
+  overflow: hidden;
+}
+.cases-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #0284c7, #38bdf8);
+  transition: width 1.2s cubic-bezier(.22,1,.36,1);
+  opacity: .85;
+}
+.cases-pct {
+  font-size: 12px;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* ── Hunt Table enhancements ────────────────────────────────────────────── */
+.ht-art {
+  color: var(--dt6);
+  font-size: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ht-prog { min-width: 100px; }
+.ht-prog-wrap { display: flex; align-items: center; gap: 6px; }
+.ht-prog-track {
+  flex: 1;
+  height: 5px;
+  border-radius: 99px;
+  background: var(--glass-border-soft);
+  overflow: hidden;
+}
+.ht-prog-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #15803d, #22c55e);
+  transition: width 1.2s cubic-bezier(.22,1,.36,1);
+}
+.ht-prog-lbl { font-size: 10px; font-family: 'JetBrains Mono', monospace; color: var(--dt5); min-width: 28px; text-align: right; }
+
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 1400px) {
-  .kpi-row { grid-template-columns: repeat(4, 1fr); }
-  .ch-row  { grid-template-columns: 1fr 1fr 220px; }
-  .hm-row  { grid-template-columns: 1fr 280px; }
+  .kpi-row      { grid-template-columns: repeat(4, 1fr); }
+  .ch-row       { grid-template-columns: 1fr 1fr 220px; }
+  .hm-row       { grid-template-columns: 1fr 280px; }
+  .os-trend-row { grid-template-columns: 280px 1fr; }
+  .os-trend-row > :last-child { grid-column: 1 / -1; }
 }
 @media (max-width: 1100px) {
   .kpi-row { grid-template-columns: repeat(2, 1fr); }
@@ -2060,13 +2670,17 @@ onUnmounted(()=>{ if(timer) clearInterval(timer) })
   .ch-card--donut { grid-column: 1 / -1; }
   .hm-row  { grid-template-columns: 1fr; }
   .tl-row  { grid-template-columns: 1fr; }
+  .os-trend-row { grid-template-columns: 1fr 1fr; }
+  .os-trend-row > :last-child { grid-column: 1 / -1; }
 }
 @media (max-width: 740px) {
-  .kpi-row { grid-template-columns: repeat(2, 1fr); }
-  .ins-row { grid-template-columns: 1fr; }
-  .ch-row  { grid-template-columns: 1fr; }
-  .hm-row  { grid-template-columns: 1fr; }
-  .tl-row  { grid-template-columns: 1fr; }
+  .kpi-row      { grid-template-columns: repeat(2, 1fr); }
+  .ins-row      { grid-template-columns: 1fr; }
+  .ch-row       { grid-template-columns: 1fr; }
+  .hm-row       { grid-template-columns: 1fr; }
+  .tl-row       { grid-template-columns: 1fr; }
+  .os-trend-row { grid-template-columns: 1fr; }
+  .rh-body      { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {
   .kpi-row { grid-template-columns: 1fr; }

@@ -221,7 +221,8 @@ const navGroups = [
   {
     label: 'SERVER',
     items: [
-      { path: '/server-admin', icon: 'mdi-server-network',   title: 'Server', color: '#a78bfa' },
+      { path: '/server-admin', icon: 'mdi-server-network', title: 'Server', color: '#a78bfa' },
+      { path: '/tools',        icon: 'mdi-tools',          title: 'Tools',  color: '#a78bfa' },
     ],
   },
 ]

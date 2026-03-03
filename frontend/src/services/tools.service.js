@@ -20,7 +20,7 @@ export const getTools = async () => {
  * @returns {Promise<Object>} Tool information
  */
 export const getToolInfo = async (name) => {
-  const response = await api.get(`/api/tools`, { params: { name } });
+  const response = await api.get(`/api/tools/${encodeURIComponent(name)}`);
   return response.data;
 };
 

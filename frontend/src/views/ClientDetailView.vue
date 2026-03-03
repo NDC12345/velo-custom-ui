@@ -221,8 +221,22 @@
                     {{ getFlowStateLabel(item.state) }}
                   </v-chip>
                 </template>
+                <template #item.session_id="{ item }">
+                  <a class="clickable-id" @click="$router.push('/flows/' + item.session_id + '?client_id=' + clientId)"
+                     style="color: var(--accent-hover); font-family: var(--font-mono); font-size: 12px; cursor: pointer;">
+                    {{ item.session_id }}
+                  </a>
+                </template>
                 <template #item.create_time="{ item }">
-                  {{ formatTimestamp(item.create_time) }}
+                  <span style="color: var(--text-secondary); font-size: 12px;">{{ formatTimestamp(item.create_time) }}</span>
+                </template>
+                <template #item.start_time="{ item }">
+                  <span style="color: var(--text-secondary); font-size: 12px;">{{ item.start_time ? formatTimestamp(item.start_time) : '—' }}</span>
+                </template>
+                <template #item.active_time="{ item }">
+                  <span :style="{ color: item.state === 'FINISHED' ? 'var(--success)' : item.state === 'ERROR' ? 'var(--error)' : 'var(--text-muted)', fontSize: '12px' }">
+                    {{ item.active_time ? formatTimestamp(item.active_time) : '—' }}
+                  </span>
                 </template>
                 <template #item.artifacts_with_results="{ item }">
                   <div class="d-flex flex-wrap ga-1">
@@ -342,95 +356,113 @@
 
         <!-- VFS Tab -->
         <v-window-item value="vfs">
-          <v-card rounded="xl" class="detail-card" elevation="0">
-            <v-card-title class="card-header d-flex align-center">
-              <v-icon class="mr-2" size="20" color="warning">mdi-folder</v-icon>
-              Virtual FileSystem
-              <v-spacer></v-spacer>
-              <v-btn
-                variant="tonal"
-                color="info"
-                size="x-small"
-                rounded="lg"
-                prepend-icon="mdi-folder-download"
-                class="mr-2"
-                :loading="vfsCollecting"
-                title="Collect directory from agent"
-                @click="collectVFSDirectory"
-              >
+          <div class="vfs-container">
+            <!-- Toolbar -->
+            <div class="vfs-toolbar">
+              <v-select v-model="vfsAccessor" :items="vfsAccessors" density="compact" variant="outlined" rounded="lg"
+                hide-details style="max-width:110px; flex-shrink:0;" />
+              <v-text-field v-model="vfsPathInput" density="compact" variant="outlined" rounded="lg" hide-details
+                placeholder="/path/to/dir" @keyup.enter="navigateVFS(vfsPathInput)" style="flex:1; min-width:0;" />
+              <v-btn variant="tonal" color="info" size="small" rounded="lg" :loading="vfsCollecting"
+                prepend-icon="mdi-cloud-download-outline" @click="collectVFSDirectory" title="Collect from agent (downloads live filesystem data)">
                 Collect
               </v-btn>
-              <v-btn
-                variant="tonal"
-                color="primary"
-                size="x-small"
-                rounded="lg"
-                prepend-icon="mdi-refresh"
-                @click="loadVFS()"
-              >
-                Refresh
-              </v-btn>
-            </v-card-title>
-            <v-card-text class="pa-0">
-              <div class="vfs-breadcrumb pa-3" style="border-bottom: 1px solid var(--border-color);">
-                <v-breadcrumbs :items="vfsBreadcrumbs" density="compact">
-                  <template #item="{ item }">
-                    <v-breadcrumbs-item @click="navigateVFS(item.path)">
-                      {{ item.title }}
-                    </v-breadcrumbs-item>
-                  </template>
-                </v-breadcrumbs>
+              <v-btn variant="tonal" color="primary" size="small" rounded="lg" :loading="vfsLoading"
+                icon="mdi-refresh" @click="loadVFS()" title="Reload cached data" />
+            </div>
+
+            <!-- Breadcrumbs -->
+            <div class="vfs-breadcrumbs">
+              <button class="vfs-crumb" @click="navigateVFS('/')">
+                <v-icon size="13" class="mr-1">mdi-home</v-icon>Root
+              </button>
+              <template v-for="(crumb, ci) in vfsBreadcrumbs.slice(1)" :key="ci">
+                <v-icon size="12" style="color:var(--text-muted);">mdi-chevron-right</v-icon>
+                <button class="vfs-crumb" @click="navigateVFS(crumb.path)">{{ crumb.title }}</button>
+              </template>
+            </div>
+
+            <!-- File table -->
+            <div class="vfs-table-wrapper">
+              <table class="vfs-file-table">
+                <thead>
+                  <tr>
+                    <th style="width:40px;"></th>
+                    <th>Name</th>
+                    <th style="width:90px;">Size</th>
+                    <th style="width:120px;">Mode</th>
+                    <th style="width:160px;">Mtime</th>
+                    <th style="width:160px;">Atime</th>
+                    <th style="width:160px;">Ctime</th>
+                    <th style="width:160px;">Btime</th>
+                    <th style="width:44px;"></th>
+                  </tr>
+                </thead>
+                <tbody v-if="!vfsLoading">
+                  <tr v-if="vfsFiles.length === 0">
+                    <td colspan="9" style="text-align:center;padding:32px;color:var(--text-muted);">
+                      <v-icon size="28" class="mb-2">mdi-folder-open-outline</v-icon><br>
+                      No data — click <strong>Collect</strong> to load from agent
+                    </td>
+                  </tr>
+                  <tr v-for="file in vfsFiles" :key="file.Name+file.Mtime"
+                      :class="{ 'vfs-row-selected': vfsSelectedFile === file }"
+                      @click="selectVFSFile(file)">
+                    <td class="vfs-icon-cell">
+                      <v-icon size="15"
+                        :icon="isVfsDir(file) ? 'mdi-folder' : 'mdi-file-outline'"
+                        :color="isVfsDir(file) ? '#f59e0b' : '#64748b'" />
+                    </td>
+                    <td class="vfs-name-cell" @dblclick="isVfsDir(file) && navigateVFS(joinPath(vfsPath, file.Name))">
+                      {{ file.Name }}
+                    </td>
+                    <td class="vfs-num-cell">{{ isVfsDir(file) ? '—' : formatFileSize(file.Size) }}</td>
+                    <td><code class="vfs-mode">{{ file.Mode || '—' }}</code></td>
+                    <td class="vfs-time-cell">{{ vfsFormatTime(file.Mtime) }}</td>
+                    <td class="vfs-time-cell">{{ vfsFormatTime(file.Atime) }}</td>
+                    <td class="vfs-time-cell">{{ vfsFormatTime(file.Ctime) }}</td>
+                    <td class="vfs-time-cell">{{ vfsFormatTime(file.Btime) }}</td>
+                    <td class="vfs-action-cell">
+                      <v-btn v-if="!isVfsDir(file)" icon="mdi-download" variant="text" size="x-small" color="primary"
+                        @click.stop="downloadVFSFile(file)" title="Download" />
+                    </td>
+                  </tr>
+                </tbody>
+                <tbody v-else>
+                  <tr v-for="n in 8" :key="n">
+                    <td colspan="9" style="padding:6px 12px;">
+                      <div style="height:14px;border-radius:4px;background:var(--bg-elevated);animation:shimmer 1.5s infinite;"></div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Properties panel (shown when a file/dir is selected) -->
+            <div v-if="vfsSelectedFile" class="vfs-props-panel">
+              <div class="vfs-props-header">
+                <v-icon size="14" class="mr-1" :color="isVfsDir(vfsSelectedFile) ? '#f59e0b' : '#64748b'">
+                  {{ isVfsDir(vfsSelectedFile) ? 'mdi-folder' : 'mdi-file-outline' }}
+                </v-icon>
+                <span style="font-weight:600;color:var(--text-primary);font-size:13px;">{{ vfsSelectedFile.Name }}</span>
               </div>
-              <v-data-table
-                :headers="vfsHeaders"
-                :items="vfsFiles"
-                :loading="vfsLoading"
-                density="compact"
-                class="flows-table"
-                items-per-page="50"
-                no-data-text="Empty directory — click Collect to load content from agent"
-                @click:row="(_, { item }) => vfsItemClick(item)"
-                style="cursor: pointer;"
-              >
-                <template #item.Name="{ item }">
-                  <div class="d-flex align-center">
-                    <v-icon
-                      size="16"
-                      class="mr-2"
-                      :icon="(item.Mode?.[0]==='d'||item.is_dir) ? 'mdi-folder' : 'mdi-file-outline'"
-                      :color="(item.Mode?.[0]==='d'||item.is_dir) ? 'warning' : undefined"
-                    ></v-icon>
-                    {{ item.Name || item.name }}
+              <div class="vfs-props-body">
+                <div class="vfs-props-col">
+                  <div v-for="f in vfsFileFields" :key="f.label" class="vfs-prop-row">
+                    <span class="vfs-prop-lbl">{{ f.label }}</span>
+                    <span class="vfs-prop-val">{{ f.value }}</span>
                   </div>
-                </template>
-                <template #item.Size="{ item }">
-                  <span v-if="!(item.Mode?.[0]==='d'||item.is_dir)" style="color: var(--text-muted); font-size: 12px;">
-                    {{ formatFileSize(item.Size || item.size) }}
-                  </span>
-                  <span v-else style="color: var(--text-muted);">—</span>
-                </template>
-                <template #item.Mode="{ item }">
-                  <code style="font-size: 11px; color: var(--text-muted); letter-spacing: 0.5px;">{{ item.Mode || '—' }}</code>
-                </template>
-                <template #item.Mtime="{ item }">
-                  <span style="font-size: 12px; color: var(--text-muted);">
-                    {{ item.Mtime ? formatTimestamp(item.Mtime) : '—' }}
-                  </span>
-                </template>
-                <template #item.actions="{ item }">
-                  <v-btn
-                    v-if="!(item.Mode?.[0]==='d'||item.is_dir)"
-                    icon="mdi-download"
-                    variant="text"
-                    size="x-small"
-                    color="primary"
-                    title="Download file"
-                    @click.stop="downloadVFSFile(item)"
-                  ></v-btn>
-                </template>
-              </v-data-table>
-            </v-card-text>
-          </v-card>
+                </div>
+                <div v-if="Object.keys(vfsExtraData).length" class="vfs-props-col">
+                  <div class="vfs-props-col-title">Properties</div>
+                  <div v-for="(val, key) in vfsExtraData" :key="key" class="vfs-prop-row">
+                    <span class="vfs-prop-lbl">{{ key }}</span>
+                    <span class="vfs-prop-val">{{ val }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </v-window-item>
       </v-window>
     </template>
@@ -477,27 +509,59 @@
     </v-dialog>
 
     <!-- Flow Results Dialog -->
-    <v-dialog v-model="flowResultsDialog" max-width="900">
+    <v-dialog v-model="flowResultsDialog" max-width="1100" scrollable>
       <v-card rounded="xl" class="detail-card">
-        <v-card-title class="card-header d-flex align-center">
+        <v-card-title class="card-header d-flex align-center" style="flex-shrink:0;">
           <v-icon class="mr-2" size="20" color="info">mdi-table</v-icon>
-          Flow Results: {{ selectedFlow?.session_id }}
+          Flow Results: <span style="font-family:var(--font-mono);font-size:13px;margin-left:6px;color:var(--accent-hover);">{{ selectedFlow?.session_id }}</span>
           <v-spacer></v-spacer>
+          <!-- Artifact picker for multi-artifact flows -->
+          <v-select
+            v-if="(selectedFlow?.artifacts_with_results||[]).length > 1"
+            v-model="flowResultArtifact"
+            :items="selectedFlow.artifacts_with_results"
+            density="compact"
+            variant="outlined"
+            rounded="lg"
+            hide-details
+            style="max-width:280px;margin-right:8px;"
+            @update:model-value="loadSelectedFlowResults"
+          />
           <v-btn icon="mdi-close" variant="text" size="x-small" @click="flowResultsDialog = false"></v-btn>
         </v-card-title>
-        <v-card-text class="pa-4">
-          <v-progress-linear v-if="loadingFlowResults" indeterminate color="primary" class="mb-3"></v-progress-linear>
-          <div v-if="flowResults.length === 0 && !loadingFlowResults" class="text-center pa-8" style="color: var(--text-muted);">
-            No results available
+        <v-card-text class="pa-0" style="max-height:75vh; overflow:auto;">
+          <v-progress-linear v-if="loadingFlowResults" indeterminate color="primary"></v-progress-linear>
+          <div v-if="!loadingFlowResults && flowResults.length === 0" class="empty-state pa-10">
+            <div class="empty-state__icon"><v-icon size="32" color="#64748b">mdi-table-off</v-icon></div>
+            <div class="empty-state__title">No results available</div>
+            <div class="empty-state__desc">The flow may still be running, or returned no data.</div>
           </div>
-          <v-data-table
-            v-else
-            :headers="flowResultHeaders"
-            :items="flowResults"
-            density="compact"
-            class="flows-table"
-          ></v-data-table>
+          <div v-else-if="flowResults.length" style="overflow-x:auto;">
+            <table class="vfs-results-table">
+              <thead>
+                <tr>
+                  <th v-for="h in flowResultHeaders" :key="h.key">{{ h.title }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, ri) in flowResults" :key="ri">
+                  <td v-for="h in flowResultHeaders" :key="h.key">
+                    <span v-if="typeof row[h.key] === 'object' && row[h.key] !== null"
+                          style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted);">
+                      {{ JSON.stringify(row[h.key]) }}
+                    </span>
+                    <span v-else style="font-size:12px;">{{ row[h.key] ?? '—' }}</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </v-card-text>
+        <v-card-actions v-if="flowResults.length" class="px-4 pb-3 pt-2" style="border-top:1px solid var(--border);flex-shrink:0;">
+          <span style="font-size:12px;color:var(--text-muted);">{{ flowResults.length }} row{{ flowResults.length !== 1 ? 's' : '' }}</span>
+          <v-spacer />
+          <v-btn variant="text" size="small" rounded="lg" @click="flowResultsDialog = false">Close</v-btn>
+        </v-card-actions>
       </v-card>
     </v-dialog>
 
@@ -573,6 +637,7 @@ const selectedFlow = ref(null)
 const flowResults = ref([])
 const flowResultHeaders = ref([])
 const loadingFlowResults = ref(false)
+const flowResultArtifact = ref('')
 
 // Collect artifact
 const showCollectDialog = ref(false)
@@ -597,13 +662,48 @@ const vfsFiles = ref([])
 const vfsLoading = ref(false)
 const vfsCollecting = ref(false)
 const vfsBreadcrumbs = ref([{ title: 'Root', path: '/' }])
-const vfsHeaders = [
-  { title: 'Name', key: 'Name', sortable: true },
-  { title: 'Size', key: 'Size', width: '100', sortable: true },
-  { title: 'Permissions', key: 'Mode', width: '130', sortable: false },
-  { title: 'Modified', key: 'Mtime', width: '185', sortable: true },
-  { title: '', key: 'actions', width: '56', sortable: false, align: 'end' },
-]
+const vfsAccessor = ref('file')
+const vfsAccessors = ['file', 'ntfs', 'registry', 'ssh', 'smb', 'zip']
+const vfsSelectedFile = ref(null)
+const vfsPathInput = ref('/')
+
+const isVfsDir = (f) => (f?.Mode?.[0] === 'd') || !!f?.is_dir
+
+function vfsFormatTime(ts) {
+  if (!ts || ts === '0001-01-01T00:00:00Z') return '—'
+  try {
+    const d = new Date(ts)
+    if (isNaN(d.getTime())) return '—'
+    return d.toLocaleString()
+  } catch { return '—' }
+}
+
+const vfsFileFields = computed(() => {
+  const f = vfsSelectedFile.value
+  if (!f) return []
+  return [
+    { label: 'Size', value: isVfsDir(f) ? '—' : formatFileSize(f.Size) },
+    { label: 'Mode', value: f.Mode || '—' },
+    { label: 'Mtime', value: vfsFormatTime(f.Mtime) },
+    { label: 'Atime', value: vfsFormatTime(f.Atime) },
+    { label: 'Ctime', value: vfsFormatTime(f.Ctime) },
+    { label: 'Btime', value: vfsFormatTime(f.Btime) },
+  ]
+})
+
+const vfsExtraData = computed(() => {
+  const d = vfsSelectedFile.value?.Data
+  if (!d || typeof d !== 'object') return {}
+  return Object.fromEntries(Object.entries(d).filter(([, v]) => v != null && v !== '' && v !== 0))
+})
+
+function selectVFSFile(file) {
+  vfsSelectedFile.value = (vfsSelectedFile.value === file) ? null : file
+}
+
+function joinPath(base, name) {
+  return base === '/' ? `/${name}` : `${base}/${name}`
+}
 
 const isOnline = computed(() => {
   if (!clientInfo.value) return false
@@ -641,10 +741,12 @@ const networkItems = computed(() => {
 })
 
 const flowHeaders = [
-  { title: 'Session ID', key: 'session_id', width: '200' },
+  { title: 'Flow ID', key: 'session_id', width: '185' },
   { title: 'Artifacts', key: 'artifacts_with_results' },
-  { title: 'State', key: 'state', width: '120' },
-  { title: 'Created', key: 'create_time', width: '180' },
+  { title: 'State', key: 'state', width: '110' },
+  { title: 'Created', key: 'create_time', width: '165' },
+  { title: 'Started', key: 'start_time', width: '165' },
+  { title: 'Completed', key: 'active_time', width: '165' },
   { title: 'Actions', key: 'actions', width: '100', align: 'end', sortable: false },
 ]
 
@@ -733,32 +835,26 @@ async function deleteClient() {
 
 async function viewFlowResults(flow) {
   selectedFlow.value = flow
+  flowResultArtifact.value = (flow.artifacts_with_results || [])[0] || ''
   flowResultsDialog.value = true
+  await loadSelectedFlowResults()
+}
+
+async function loadSelectedFlowResults() {
   loadingFlowResults.value = true
+  flowResults.value = []
+  flowResultHeaders.value = []
   try {
-    const res = await flowService.getFlowResults(flow.session_id, clientId)
-    const data = res.data || res
-    const rows = data.rows || []
-    const columns = data.columns || []
-    if (columns.length) {
-      flowResultHeaders.value = columns.map(c => ({ title: c, key: c, sortable: true }))
-      flowResults.value = rows.map(row => {
-        const obj = {}
-        columns.forEach((c, i) => { obj[c] = row.cell?.[i] || row[c] || '' })
-        return obj
-      })
-    } else if (Array.isArray(rows) && rows.length) {
-      const keys = Object.keys(rows[0])
+    const artifact = flowResultArtifact.value
+    const res = await flowService.getFlowResults(selectedFlow.value.session_id, clientId, { artifact })
+    const items = res.items || res.data?.items || []
+    if (items.length) {
+      const keys = Object.keys(items[0]).filter(k => !k.startsWith('_') || k === '_Source')
       flowResultHeaders.value = keys.map(k => ({ title: k, key: k, sortable: true }))
-      flowResults.value = rows
-    } else {
-      flowResultHeaders.value = []
-      flowResults.value = []
+      flowResults.value = items
     }
   } catch (err) {
     console.error('Failed to load flow results:', err)
-    flowResults.value = []
-    flowResultHeaders.value = []
   } finally {
     loadingFlowResults.value = false
   }
@@ -892,13 +988,14 @@ async function executeShellCommand() {
 // VFS Tab Methods
 async function loadVFS(path = vfsPath.value) {
   vfsLoading.value = true
+  vfsSelectedFile.value = null
   try {
     const response = await api.get(`/api/vfs/${clientId}`, {
       params: { path }
     })
-    // Proxy returns { items: [...], total: N } with Name/Mode/Size fields
     vfsFiles.value = response.data?.items || response.data?.files || []
     vfsPath.value = path
+    vfsPathInput.value = path
     updateVFSBreadcrumbs(path)
   } catch (err) {
     vfsFiles.value = []
@@ -919,18 +1016,17 @@ function updateVFSBreadcrumbs(path) {
 }
 
 function navigateVFS(path) {
+  vfsPathInput.value = path
   loadVFS(path)
 }
 
 function vfsItemClick(file) {
-  // Proxy returns Name and Mode fields (Mode[0]==='d' means directory)
   const name = file.Name || file.name
-  const isDir = (file.Mode?.[0] === 'd') || file.is_dir || false
+  const isDir = isVfsDir(file)
   if (isDir) {
-    const newPath = vfsPath.value === '/' ? `/${name}` : `${vfsPath.value}/${name}`
-    loadVFS(newPath)
+    navigateVFS(joinPath(vfsPath.value, name))
   } else {
-    snackbar.value = { show: true, text: `File: ${name}`, color: 'info' }
+    selectVFSFile(file)
   }
 }
 
@@ -1053,12 +1149,74 @@ onMounted(() => {
   outline: none;
 }
 
-.vfs-breadcrumb :deep(.v-breadcrumbs-item) {
-  cursor: pointer;
-  color: var(--text-secondary);
+/* ====== VFS ====== */
+.vfs-container {
+  display: flex; flex-direction: column; gap: 0;
+  background: var(--bg-sidebar); border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
 }
+.vfs-toolbar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; background: var(--bg-elevated); border-bottom: 1px solid var(--border);
+}
+.vfs-breadcrumbs {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 2px;
+  padding: 6px 14px; background: var(--bg-card); border-bottom: 1px solid var(--border);
+  min-height: 32px;
+}
+.vfs-crumb {
+  background: none; border: none; cursor: pointer; padding: 2px 5px; border-radius: 5px;
+  font-size: 12px; color: var(--accent); display: flex; align-items: center;
+  transition: background 0.15s;
+}
+.vfs-crumb:hover { background: rgba(255,255,255,0.06); }
 
-.vfs-breadcrumb :deep(.v-breadcrumbs-item):hover {
-  color: var(--accent);
+.vfs-table-wrapper {
+  overflow: auto; max-height: 380px; flex: 1;
 }
+.vfs-file-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.vfs-file-table th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--bg-elevated); color: var(--text-secondary);
+  font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 8px 10px; border-bottom: 2px solid var(--border); white-space: nowrap; text-align: left;
+}
+.vfs-file-table td { padding: 5px 10px; border-bottom: 1px solid var(--border); color: var(--text-primary); vertical-align: middle; }
+.vfs-file-table tbody tr { cursor: pointer; transition: background 0.1s; }
+.vfs-file-table tbody tr:hover { background: rgba(255,255,255,0.035); }
+.vfs-row-selected { background: rgba(99,102,241,0.13) !important; }
+.vfs-icon-cell { width: 34px; padding-left: 14px !important; }
+.vfs-name-cell { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.vfs-num-cell { text-align: right; color: var(--text-muted); white-space: nowrap; }
+.vfs-time-cell { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.vfs-action-cell { width: 44px; text-align: center; }
+.vfs-mode { font-size: 11px; color: var(--text-muted); background: var(--bg-elevated); padding: 1px 4px; border-radius: 4px; }
+
+/* Properties panel */
+.vfs-props-panel {
+  border-top: 1px solid var(--border); background: var(--bg-elevated); padding: 10px 16px 14px;
+}
+.vfs-props-header { display: flex; align-items: center; margin-bottom: 10px; }
+.vfs-props-body { display: flex; gap: 32px; flex-wrap: wrap; }
+.vfs-props-col { display: flex; flex-direction: column; gap: 4px; min-width: 200px; }
+.vfs-props-col-title { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px; }
+.vfs-prop-row { display: flex; gap: 10px; align-items: baseline; }
+.vfs-prop-lbl { font-size: 11px; color: var(--text-muted); min-width: 52px; flex-shrink: 0; }
+.vfs-prop-val { font-size: 12px; color: var(--text-primary); word-break: break-all; }
+
+/* Flow results table */
+.vfs-results-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.vfs-results-table th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--bg-elevated); color: var(--text-secondary);
+  font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+  padding: 8px 12px; border-bottom: 2px solid var(--border); white-space: nowrap; text-align: left;
+}
+.vfs-results-table td {
+  padding: 6px 12px; border-bottom: 1px solid var(--border);
+  color: var(--text-primary); vertical-align: top; max-width: 280px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vfs-results-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+
+@keyframes shimmer { 0% { opacity: 0.4; } 50% { opacity: 0.8; } 100% { opacity: 0.4; } }
 </style>

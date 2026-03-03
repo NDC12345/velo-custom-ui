@@ -441,12 +441,42 @@ exports.estimateHunt = asyncHandler(async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * POST /api/flows/collect — collect artifact from client
+ * POST /api/flows/collect — collect artifact from client or server
  * Velo: POST /api/v1/CollectArtifact
+ *
+ * Normalises the request body so the wizard's simplified format works:
+ *   - Builds `specs` array from `artifacts` + `parameters` if not provided
+ *   - Defaults `client_id` to "server" when absent (server-side collection)
+ *   - Maps `resources` keys to Velo protobuf field names
  */
 exports.collectArtifact = asyncHandler(async (req, res) => {
+    const body = { ...req.body };
+
+    // Default to server-side collection when no client_id supplied
+    if (!body.client_id) body.client_id = 'server';
+
+    // Build specs array if the caller used the simplified wizard format
+    if (!body.specs && Array.isArray(body.artifacts) && body.artifacts.length > 0) {
+        const sharedEnv = body.parameters?.env || [];
+        body.specs = body.artifacts.map(name => ({
+            artifact: name,
+            parameters: sharedEnv.length > 0 ? { env: sharedEnv } : undefined,
+        }));
+    }
+
+    // Normalise resource limits (wizard uses camelCase; Velo expects snake_case)
+    if (body.resources) {
+        const r = body.resources;
+        body.urgent      = body.urgent      || undefined;
+        // These are the protobuf field names Velo expects:
+        if (r.cpuLimit   !== undefined) { r.cpu_limit    = r.cpuLimit;   delete r.cpuLimit; }
+        if (r.iopsLimit  !== undefined) { r.iops_limit   = r.iopsLimit;  delete r.iopsLimit; }
+        if (r.maxRows    !== undefined) { r.max_rows      = r.maxRows;    delete r.maxRows; }
+        if (r.maxBytes   !== undefined) { r.max_upload_bytes = r.maxBytes; delete r.maxBytes; }
+    }
+
     const response = await vproxy(req, '/api/v1/CollectArtifact', {
-        method: 'POST', data: req.body,
+        method: 'POST', data: body,
     });
     res.status(201).json(response);
 });
@@ -616,8 +646,23 @@ exports.getArtifactFile = asyncHandler(async (req, res) => {
 /**
  * POST /api/artifacts — set/create artifact
  * Velo: POST /api/v1/SetArtifactFile
+ *
+ * Security guards:
+ *   - artifact field must be a non-empty string (YAML)
+ *   - max 1 MB to prevent memory exhaustion
+ *   - body must not contain null bytes
  */
 exports.setArtifact = asyncHandler(async (req, res) => {
+    const yaml = req.body?.artifact;
+    if (typeof yaml !== 'string' || yaml.trim().length === 0) {
+        return res.status(400).json({ error: 'artifact field must be a non-empty YAML string' });
+    }
+    if (yaml.length > 1_000_000) { // 1 MB
+        return res.status(413).json({ error: 'Artifact definition too large (max 1 MB)' });
+    }
+    if (yaml.includes('\0')) {
+        return res.status(400).json({ error: 'Artifact definition contains invalid characters' });
+    }
     const response = await vproxy(req, '/api/v1/SetArtifactFile', {
         method: 'POST', data: req.body,
     });
@@ -649,11 +694,62 @@ exports.deleteArtifact = asyncHandler(async (req, res) => {
 /**
  * POST /api/artifacts/pack — load artifact pack
  * Velo: POST /api/v1/LoadArtifactPack
+ *
+ * Security guards:
+ *   - data field must be a valid base64 string
+ *   - decoded size must be <= 50 MB (prevents memory exhaustion from large payloads)
+ *   - content must start with ZIP magic bytes (PK\x03\x04) OR be valid UTF-8 YAML text
+ *   - name field is sanitized to basename with safe chars only
  */
 exports.loadArtifactPack = asyncHandler(async (req, res) => {
+    const { data, name } = req.body || {};
+
+    // 1. data field must be present and a string
+    if (!data || typeof data !== 'string') {
+        return res.status(400).json({ error: 'data field is required and must be a base64-encoded string' });
+    }
+
+    // 2. Validate strict base64 format (RFC 4648)
+    if (!/^[A-Za-z0-9+/]+={0,2}$/.test(data)) {
+        return res.status(400).json({ error: 'data field is not valid base64' });
+    }
+
+    // 3. Estimate decoded size from base64 length to avoid allocating huge buffers
+    const MAX_PACK_BYTES = 50 * 1024 * 1024; // 50 MB
+    const estimatedBytes = Math.ceil(data.length * 0.75);
+    if (estimatedBytes > MAX_PACK_BYTES) {
+        return res.status(413).json({
+            error: `Artifact pack too large. Maximum decoded size is ${MAX_PACK_BYTES / 1024 / 1024} MB`,
+        });
+    }
+
+    // 4. Decode and validate magic bytes
+    const buf = Buffer.from(data, 'base64');
+    const isZip  = buf.length >= 4 && buf[0] === 0x50 && buf[1] === 0x4B &&
+                   (buf[2] === 0x03 || buf[2] === 0x05 || buf[2] === 0x07); // PK header
+    // YAML: readable UTF-8 starting with non-binary chars
+    const isYaml = !isZip && buf.length > 0 && !buf.slice(0, 512).some(b => b === 0 || (b < 7 && b !== 9 && b !== 10 && b !== 13));
+
+    if (!isZip && !isYaml) {
+        return res.status(400).json({
+            error: 'File must be a valid .zip artifact pack or a .yaml artifact definition',
+        });
+    }
+
+    // 5. Sanitize the name field: basename only, allow [a-zA-Z0-9._-], max 200 chars
+    const safeName = (typeof name === 'string' ? name : '')
+        .replace(/[^a-zA-Z0-9._\-]/g, '')
+        .slice(0, 200) || (isZip ? 'artifact-pack.zip' : 'artifact.yaml');
+
     const response = await vproxy(req, '/api/v1/LoadArtifactPack', {
-        method: 'POST', data: req.body,
+        method: 'POST',
+        data: { data, name: safeName },
     });
+
+    // Invalidate artifacts cache so new artifacts appear immediately
+    for (const key of simpleCache.keys()) {
+        if (key.startsWith('artifacts:')) simpleCache.delete(key);
+    }
     res.json(response);
 });
 
@@ -1673,25 +1769,23 @@ exports.getDownload = asyncHandler(async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * GET /api/tools — list tools
- * Velo: GET /api/v1/GetToolInfo (per-tool endpoint)
- * For listing all tools, we fetch artifact definitions that reference tools.
- * Alternatively, the inventory is embedded in monitoring state.
+ * GET /api/tools — list all tools
+ * Velo: GET /api/v1/GetToolInfo (without name returns all known tools on recent Velo)
  */
 exports.getTools = asyncHandler(async (req, res) => {
-    const cacheKey = 'tools:all';
+    // If a name param is supplied (single-tool lookup), skip the 'all' cache
+    const nameParam = req.query.name;
+    const cacheKey = nameParam ? `tools:${nameParam}` : 'tools:all';
     const cached = cacheGet(cacheKey);
     if (cached) return res.json(cached);
 
     try {
-        // Try GetToolInfo without params — some Velo versions list all tools
         const response = await vproxy(req, '/api/v1/GetToolInfo', {
             method: 'GET', params: req.query,
         });
         cacheSet(cacheKey, response, 30000);
         res.json(response);
     } catch (error) {
-        // GetToolInfo may need a name param; synthesize empty list
         if (error.status === 503 || error.status === 404) {
             const empty = { items: [], total: 0 };
             cacheSet(cacheKey, empty, 10000);
@@ -1702,14 +1796,64 @@ exports.getTools = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /api/tools — set tool info
+ * GET /api/tools/:toolName — single tool info
+ * Velo: GET /api/v1/GetToolInfo?name=xxx
+ */
+exports.getToolInfo = asyncHandler(async (req, res) => {
+    const { toolName } = req.params;
+    const cacheKey = `tools:${toolName}`;
+    const cached = cacheGet(cacheKey);
+    if (cached) return res.json(cached);
+
+    try {
+        const response = await vproxy(req, '/api/v1/GetToolInfo', {
+            method: 'GET', params: { name: toolName },
+        });
+        cacheSet(cacheKey, response, 30000);
+        res.json(response);
+    } catch (error) {
+        if (error.status === 404) return res.json({ name: toolName });
+        safeThrow(error);
+    }
+});
+
+/**
+ * POST /api/tools — set tool info (create/update)
  * Velo: POST /api/v1/SetToolInfo
  */
 exports.setToolInfo = asyncHandler(async (req, res) => {
     const response = await vproxy(req, '/api/v1/SetToolInfo', {
         method: 'POST', data: req.body,
     });
+    // Invalidate cached tool info so next fetch is fresh
+    const name = req.body?.name || req.body?.tool?.name;
+    if (name) simpleCache.delete(`tools:${name}`);
+    simpleCache.delete('tools:all');
     res.json(response);
+});
+
+/**
+ * DELETE /api/tools/:toolName — remove/reset a tool definition
+ * Velo has no dedicated delete endpoint; reset via SetToolInfo with minimal definition.
+ */
+exports.deleteTool = asyncHandler(async (req, res) => {
+    const { toolName } = req.params;
+    try {
+        // Sending an empty tool definition effectively "resets" the tool in Velo.
+        // On some versions this removes the custom override so the built-in definition is used.
+        await vproxy(req, '/api/v1/SetToolInfo', {
+            method: 'POST',
+            data: { tool: { name: toolName } },
+        });
+        simpleCache.delete(`tools:${toolName}`);
+        simpleCache.delete('tools:all');
+        res.json({ status: 'deleted', name: toolName });
+    } catch (error) {
+        if (error.status === 404) {
+            return res.json({ status: 'deleted', name: toolName });
+        }
+        safeThrow(error);
+    }
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1869,12 +2013,60 @@ exports.getReport = asyncHandler(async (req, res) => {
 
 /**
  * POST /api/uploads/tool — upload tool binary
- * Velo: POST /api/v1/UploadTool (custom handler)
+ * Velo: POST /api/v1/UploadTool
+ *
+ * The incoming request is multipart/form-data (parsed by multer):
+ *   req.file       = the binary file (buffer)
+ *   req.body.tool  = tool name string
+ *
+ * We re-pack as a native FormData and forward to Velociraptor.
+ * On Velo ≥ 0.7 UploadTool accepts multipart with fields: file + (tool)
  */
 exports.uploadTool = asyncHandler(async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ error: 'No file provided' });
+    }
+
+    // Sanitize tool name: derive from body.tool or file's originalname,
+    // then strip path separators and allow only safe chars.
+    // Allowed: alphanumeric, dots, dashes, underscores, forward-slashes (namespaced tools)
+    // Forbidden: null bytes, backslashes, parent-dir sequences, shell metacharacters
+    const rawName = typeof req.body.tool === 'string'
+        ? req.body.tool
+        : (req.file.originalname || '');
+
+    const sanitized = rawName
+        .replace(/\0/g, '')           // strip null bytes
+        .replace(/\\/g, '/')          // normalise backslashes to forward slashes
+        .replace(/\.\.\/|\.\.$/g, '') // strip ../ traversal sequences
+        .replace(/[^a-zA-Z0-9./_\-]/g, '') // allowlist: alphanumeric, ./- and slash for namespaces
+        .replace(/^\/+/, '')          // strip leading slashes
+        .slice(0, 200);               // limit length
+
+    if (!sanitized || sanitized === '.' || sanitized === '/') {
+        return res.status(400).json({
+            error: 'Tool name is invalid. Use only alphanumeric characters, dots, dashes, underscores, or namespaced paths (e.g. Tools.Windows.Binary)',
+        });
+    }
+
+    // Safe display filename for the multipart blob (basename of sanitized name)
+    const safeFilename = sanitized.replace(/.*\//, '') || 'tool-binary';
+
+    // Build native FormData (Node 18+ global)
+    const formData = new FormData();
+    formData.append('tool', sanitized);
+    const blob = new Blob([req.file.buffer], { type: 'application/octet-stream' });
+    formData.append('file', blob, safeFilename);
+
     const response = await vproxy(req, '/api/v1/UploadTool', {
-        method: 'POST', data: req.body,
+        method: 'POST',
+        data: formData,
+        // Let FormData set Content-Type with boundary automatically.
     });
+
+    // Invalidate tool cache
+    simpleCache.delete(`tools:${sanitized}`);
+    simpleCache.delete('tools:all');
     res.json(response);
 });
 

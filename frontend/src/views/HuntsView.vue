@@ -202,8 +202,14 @@
 
           <!-- Tabs -->
           <v-tabs v-model="detailTab" density="compact" class="detail-tabs">
-            <v-tab value="flows">
-              <v-icon start size="14">mdi-flash</v-icon>Flows
+            <v-tab value="overview">
+              <v-icon start size="14">mdi-information-outline</v-icon>Overview
+            </v-tab>
+            <v-tab value="requests">
+              <v-icon start size="14">mdi-code-braces</v-icon>Requests
+            </v-tab>
+            <v-tab value="clients">
+              <v-icon start size="14">mdi-laptop</v-icon>Clients
               <span v-if="detailFlows.length" class="tab-badge">{{ detailFlows.length }}</span>
             </v-tab>
             <v-tab value="results">
@@ -217,19 +223,162 @@
           </v-tabs>
 
           <v-window v-model="detailTab" class="detail-window">
-            <!-- Flows -->
-            <v-window-item value="flows">
-              <div v-if="detailLoading" class="detail-loading"><v-progress-circular size="24" indeterminate color="#00c8ff" /></div>
-              <div v-else-if="detailFlows.length === 0" class="detail-empty">No flows yet</div>
-              <div v-else class="flow-list">
-                <div v-for="f in detailFlows" :key="f.session_id" class="flow-item">
-                  <v-icon size="15" :color="flowStateColor(f.state)">{{ flowStateIcon(f.state) }}</v-icon>
-                  <div class="flow-item__info">
-                    <div class="flow-item__id">{{ f.session_id }}</div>
-                    <div class="flow-item__client">{{ f.client_id }}</div>
+            <!-- Overview -->
+            <v-window-item value="overview">
+              <div class="detail-overview-section">
+                <div class="detail-overview-grid">
+                  <div class="detail-overview-item">
+                    <span class="detail-overview-lbl">Hunt ID</span>
+                    <code class="detail-overview-val">{{ selectedHunt?.hunt_id }}</code>
                   </div>
-                  <span class="flow-state-chip" :class="'flow-' + (f.state||'running').toLowerCase()">{{ f.state || 'RUNNING' }}</span>
-                  <div class="flow-item__time">{{ formatTime(f.create_time) }}</div>
+                  <div class="detail-overview-item">
+                    <span class="detail-overview-lbl">Description</span>
+                    <span class="detail-overview-val">{{ selectedHunt?.hunt_description || '—' }}</span>
+                  </div>
+                  <div class="detail-overview-item">
+                    <span class="detail-overview-lbl">Artifact</span>
+                    <span class="detail-overview-val">{{ selectedHunt?.artifact_name || '—' }}</span>
+                  </div>
+                  <div class="detail-overview-item">
+                    <span class="detail-overview-lbl">All Artifacts</span>
+                    <div class="detail-overview-val">
+                      <span v-for="art in huntArtifacts" :key="art" class="artifact-badge mr-1 mb-1">{{ art }}</span>
+                      <span v-if="!huntArtifacts.length">—</span>
+                    </div>
+                  </div>
+                  <div class="detail-overview-item">
+                    <span class="detail-overview-lbl">State</span>
+                    <span class="detail-overview-val">
+                      <span class="state-dot" :class="stateDotClass(selectedHunt?.stateStr || '')" style="display:inline-block;margin-right:4px;" />
+                      {{ selectedHunt?.stateStr }}
+                    </span>
+                  </div>
+                  <div class="detail-overview-item">
+                    <span class="detail-overview-lbl">Created</span>
+                    <span class="detail-overview-val">{{ formatTime(selectedHunt?.create_time) }}</span>
+                  </div>
+                  <div class="detail-overview-item">
+                    <span class="detail-overview-lbl">Started</span>
+                    <span class="detail-overview-val">{{ formatTime(selectedHunt?.start_time || selectedHunt?.create_time) }}</span>
+                  </div>
+                  <div class="detail-overview-item">
+                    <span class="detail-overview-lbl">Expires</span>
+                    <span class="detail-overview-val">{{ formatTime(selectedHunt?.expires) }}</span>
+                  </div>
+                  <div class="detail-overview-item">
+                    <span class="detail-overview-lbl">OS Target</span>
+                    <span class="detail-overview-val">{{ selectedHunt?.condition?.os?.os || 'All' }}</span>
+                  </div>
+                  <div class="detail-overview-item">
+                    <span class="detail-overview-lbl">Creator</span>
+                    <span class="detail-overview-val">{{ selectedHunt?.creator || selectedHunt?.Creator || '—' }}</span>
+                  </div>
+                  <div class="detail-overview-item">
+                    <span class="detail-overview-lbl">Scheduled</span>
+                    <span class="detail-overview-val">{{ selectedHunt?.total_clients_scheduled || 0 }}</span>
+                  </div>
+                  <div class="detail-overview-item">
+                    <span class="detail-overview-lbl">Completed</span>
+                    <span class="detail-overview-val" style="color:#22c55e">{{ selectedHunt?.total_clients_with_results || 0 }}</span>
+                  </div>
+                </div>
+              </div>
+            </v-window-item>
+
+            <!-- Requests (VQL query) -->
+            <v-window-item value="requests">
+              <div v-if="detailLoading" class="detail-loading"><v-progress-circular size="24" indeterminate color="#00c8ff" /></div>
+              <div v-else-if="!huntRequestVQL && huntArtifacts.length === 0" class="detail-empty">No request data available</div>
+              <div v-else class="detail-requests-section">
+                <div class="detail-requests-info">
+                  <div class="detail-requests-label">Artifacts in this hunt</div>
+                  <div class="detail-requests-artifacts">
+                    <span v-for="art in huntArtifacts" :key="art" class="artifact-badge mr-1">{{ art }}</span>
+                  </div>
+                </div>
+                <div v-if="selectedHunt?.start_request?.parameters" class="detail-requests-params">
+                  <div class="detail-requests-label">Parameters</div>
+                  <div class="detail-requests-params-grid">
+                    <template v-for="(env, idx) in (selectedHunt.start_request.parameters.env || [])" :key="idx">
+                      <code class="param-key">{{ env.key }}</code>
+                      <span class="param-val">{{ env.value }}</span>
+                    </template>
+                  </div>
+                </div>
+                <div v-if="huntRequestVQL" class="detail-requests-vql">
+                  <div class="detail-requests-label">VQL Query (Request)</div>
+                  <pre class="vql-code-block">{{ huntRequestVQL }}</pre>
+                </div>
+                <div v-if="selectedHunt?.start_request" class="detail-requests-raw">
+                  <div class="detail-requests-label">Raw Start Request</div>
+                  <pre class="vql-code-block">{{ JSON.stringify(selectedHunt.start_request, null, 2) }}</pre>
+                </div>
+              </div>
+            </v-window-item>
+
+            <!-- Clients (individual flows per client) -->
+            <v-window-item value="clients">
+              <div v-if="detailLoading" class="detail-loading"><v-progress-circular size="24" indeterminate color="#00c8ff" /></div>
+              <div v-else-if="detailFlows.length === 0" class="detail-empty">No client flows yet</div>
+              <div v-else>
+                <!-- Clients toolbar -->
+                <div class="clients-toolbar">
+                  <v-text-field v-model="clientFlowSearch" prepend-inner-icon="mdi-magnify" placeholder="Filter clients..."
+                    variant="outlined" density="compact" rounded="lg" hide-details clearable style="max-width:220px;" />
+                  <v-spacer />
+                  <span class="results-count">{{ filteredDetailFlows.length }} clients</span>
+                  <div class="clients-pagination-controls">
+                    <v-btn variant="text" size="x-small" icon="mdi-chevron-left" :disabled="clientPage <= 1" @click="clientPage--" />
+                    <span style="font-size:11px;color:var(--text-muted);">{{ clientPageStart + 1 }}-{{ clientPageEnd }} of {{ filteredDetailFlows.length }}</span>
+                    <v-btn variant="text" size="x-small" icon="mdi-chevron-right" :disabled="clientPageEnd >= filteredDetailFlows.length" @click="clientPage++" />
+                    <v-select v-model="clientPageSize" :items="[10, 25, 50]" variant="outlined" density="compact" hide-details style="max-width:70px;font-size:11px;" />
+                  </div>
+                </div>
+                <!-- Clients table -->
+                <div class="results-table-wrapper" style="max-height:400px;">
+                  <table class="results-table clients-table">
+                    <thead>
+                      <tr>
+                        <th>Client ID</th>
+                        <th>Hostname</th>
+                        <th>Flow ID</th>
+                        <th>Started</th>
+                        <th>Completed</th>
+                        <th>State</th>
+                        <th>Duration</th>
+                        <th>Total Bytes</th>
+                        <th>Total Rows</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="f in paginatedDetailFlows" :key="f.session_id">
+                        <td>
+                          <a class="clickable-id" @click.stop="navigateToClient(f.client_id)" :title="'View client ' + f.client_id">
+                            <v-icon size="12" class="mr-1" style="opacity:0.6">mdi-open-in-new</v-icon>
+                            {{ f.client_id }}
+                          </a>
+                        </td>
+                        <td style="color:var(--text-secondary);">{{ f.hostname || f.client_info?.os_info?.hostname || '—' }}</td>
+                        <td>
+                          <a class="clickable-id" @click.stop="navigateToFlow(f.session_id, f.client_id)" :title="'View flow ' + f.session_id">
+                            <v-icon size="12" class="mr-1" style="opacity:0.6">mdi-open-in-new</v-icon>
+                            {{ f.session_id }}
+                          </a>
+                        </td>
+                        <td style="color:var(--text-muted);font-size:11px;">{{ formatTimeISO(f.create_time || f.start_time) }}</td>
+                        <td style="color:var(--text-muted);font-size:11px;">
+                          <span v-if="f.active_time || f.end_time || f.kill_timestamp">{{ formatTimeISO(f.active_time || f.end_time || f.kill_timestamp) }}</span>
+                          <span v-else style="opacity:0.4;">—</span>
+                        </td>
+                        <td>
+                          <span class="flow-state-chip" :class="'flow-' + (f.state||'running').toLowerCase()">{{ f.state || 'RUNNING' }}</span>
+                        </td>
+                        <td style="color:var(--text-muted);font-size:11px;font-family:var(--font-mono);">{{ formatDuration(f) }}</td>
+                        <td style="color:var(--text-muted);font-size:11px;font-family:var(--font-mono);">{{ f.total_uploaded_bytes || f.TotalUploadedBytes || 0 }}</td>
+                        <td style="color:var(--text-muted);font-size:11px;font-family:var(--font-mono);">{{ f.total_collected_rows || f.TotalCollectedRows || 0 }}</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </v-window-item>
@@ -392,8 +541,12 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import huntService from '@/services/hunt.service'
 import artifactService from '@/services/artifact.service'
+import flowService from '@/services/flow.service'
+
+const router = useRouter()
 
 const loading          = ref(false)
 const hunts            = ref([])
@@ -430,6 +583,13 @@ const artifactNames    = ref([])
 const loadingArtifacts = ref(false)
 const snackbar         = ref({ show: false, text: '', color: 'success' })
 let refreshTimer       = null
+
+// Clients tab
+const clientFlowSearch = ref('')
+const clientPage       = ref(1)
+const clientPageSize   = ref(10)
+// VQL request data
+const huntRequestVQL   = ref('')
 
 const newHunt = ref({ description: '', artifacts: [], osTarget: '', expiresHours: 24, clientLimit: 0, cpuLimit: 50, labels: [] })
 
@@ -599,6 +759,54 @@ function flowStateIcon(state) {
   return { FINISHED: 'mdi-check-circle', RUNNING: 'mdi-loading', ERROR: 'mdi-alert-circle', CLIENT_ERROR: 'mdi-alert-circle' }[state] || 'mdi-circle-outline'
 }
 
+// Clients tab filtering and pagination
+const filteredDetailFlows = computed(() => {
+  if (!clientFlowSearch.value) return detailFlows.value
+  const q = clientFlowSearch.value.toLowerCase()
+  return detailFlows.value.filter(f =>
+    (f.client_id || '').toLowerCase().includes(q) ||
+    (f.session_id || '').toLowerCase().includes(q) ||
+    (f.hostname || f.client_info?.os_info?.hostname || '').toLowerCase().includes(q)
+  )
+})
+const clientPageStart = computed(() => (clientPage.value - 1) * clientPageSize.value)
+const clientPageEnd = computed(() => Math.min(clientPageStart.value + clientPageSize.value, filteredDetailFlows.value.length))
+const paginatedDetailFlows = computed(() => filteredDetailFlows.value.slice(clientPageStart.value, clientPageEnd.value))
+
+watch([clientFlowSearch], () => { clientPage.value = 1 })
+
+function formatTimeISO(ts) {
+  if (!ts) return '—'
+  const ms = ts > 1e15 ? ts / 1000 : ts > 1e12 ? ts : ts * 1000
+  return new Date(ms).toISOString().replace('T', ' ').replace(/\.\d+Z/, 'Z')
+}
+
+function formatDuration(flow) {
+  const start = flow.create_time || flow.start_time || 0
+  const end = flow.active_time || flow.end_time || flow.kill_timestamp || 0
+  if (!start || !end) return '—'
+  const startMs = start > 1e15 ? start / 1000 : start > 1e12 ? start : start * 1000
+  const endMs = end > 1e15 ? end / 1000 : end > 1e12 ? end : end * 1000
+  const diff = Math.abs(endMs - startMs) / 1000
+  if (diff < 60) return `${Math.round(diff)}s`
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ${Math.round(diff % 60)}s`
+  return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}m`
+}
+
+function navigateToClient(clientId) {
+  if (clientId) {
+    showDetail.value = false
+    router.push(`/clients/${clientId}`)
+  }
+}
+
+function navigateToFlow(flowId, clientId) {
+  if (flowId) {
+    showDetail.value = false
+    router.push({ path: `/flows/${flowId}`, query: { client_id: clientId } })
+  }
+}
+
 async function loadHunts() {
   loading.value = true
   try {
@@ -642,11 +850,14 @@ async function loadResultsForArtifact(artifactName) {
 async function selectHunt(hunt) {
   selectedHunt.value   = hunt
   showDetail.value     = true
-  detailTab.value      = 'flows'
+  detailTab.value      = 'overview'
   detailFlows.value    = []
   detailResults.value  = { columns: [], rows: [] }
   detailErrors.value   = []
   detailTags.value     = []
+  huntRequestVQL.value = ''
+  clientFlowSearch.value = ''
+  clientPage.value     = 1
   resultArtifact.value = hunt.artifact_name || ''
   detailLoading.value  = true
   try {
@@ -670,6 +881,40 @@ async function selectHunt(hunt) {
     }
     if (tagsRes.status === 'fulfilled') {
       detailTags.value = tagsRes.value?.tags || tagsRes.value || []
+    }
+    // Load VQL request data
+    const sr = hunt.start_request || {}
+    if (sr.artifacts?.length) {
+      // Build VQL representation from start_request
+      const vqlLines = []
+      vqlLines.push('-- Artifacts: ' + sr.artifacts.join(', '))
+      if (sr.parameters?.env?.length) {
+        vqlLines.push('-- Parameters:')
+        sr.parameters.env.forEach(e => vqlLines.push(`--   ${e.key} = ${e.value}`))
+      }
+      vqlLines.push('')
+      vqlLines.push(`SELECT * FROM Artifact.${sr.artifacts[0]}()`)
+      huntRequestVQL.value = vqlLines.join('\n')
+    }
+    // Try to load flow request details for more accurate VQL
+    if (detailFlows.value.length > 0) {
+      try {
+        const firstFlow = detailFlows.value[0]
+        const reqData = await flowService.getFlowRequests(firstFlow.session_id, firstFlow.client_id)
+        if (reqData) {
+          const requests = reqData.items || reqData.requests || (Array.isArray(reqData) ? reqData : [])
+          if (requests.length) {
+            const vqlParts = requests.map(r => {
+              if (r.VQLClientAction?.query) {
+                return r.VQLClientAction.query.map(q => q.VQL || q.vql || '').filter(Boolean).join('\n')
+              }
+              if (r.query) return typeof r.query === 'string' ? r.query : JSON.stringify(r.query, null, 2)
+              return JSON.stringify(r, null, 2)
+            })
+            if (vqlParts.some(p => p)) huntRequestVQL.value = vqlParts.join('\n\n')
+          }
+        }
+      } catch (e) { /* flow requests may not be available */ }
     }
   } catch (e) { console.error('selectHunt:', e) }
   finally { detailLoading.value = false }
@@ -982,8 +1227,43 @@ onUnmounted(() => { if (refreshTimer) clearInterval(refreshTimer) })
 .results-count        { font-size:11px; font-family:var(--font-mono); color:var(--text-muted); }
 .results-table-wrapper{ overflow-x:auto; max-height:320px; overflow-y:auto; border-radius:6px; border:1px solid var(--border); }
 .results-table        { width:100%; border-collapse:collapse; font-size:11px; font-family:var(--font-mono); }
-.results-table th     { padding:6px 12px; text-align:left; background:rgba(0,200,255,0.04); color:var(--text-muted); font-size:10px; text-transform:uppercase; letter-spacing:0.06em; border-bottom:1px solid var(--border); white-space:nowrap; position:sticky; top:0; }
+.results-table th     { padding:6px 12px; text-align:left; background:var(--surface-alt, #0c1824); color:var(--text-muted); font-size:10px; text-transform:uppercase; letter-spacing:0.06em; border-bottom:1px solid var(--border); white-space:nowrap; position:sticky; top:0; z-index:2; box-shadow: 0 1px 0 var(--border); }
 .results-table td     { padding:5px 12px; color:var(--text-secondary); border-bottom:1px solid rgba(255,255,255,0.04); max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .results-table tr:hover td { background:rgba(0,200,255,0.03); }
 .results-truncated    { text-align:center; padding:8px; color:var(--text-muted); font-size:11px; border-top:1px solid var(--border); }
+
+/* Overview tab */
+.detail-overview-section { padding:16px 20px; }
+.detail-overview-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px 24px; }
+.detail-overview-item { display:flex; flex-direction:column; gap:2px; }
+.detail-overview-lbl { font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em; }
+.detail-overview-val { font-size:12px; color:var(--text-secondary); font-family:var(--font-mono); word-break:break-all; }
+
+/* Requests tab */
+.detail-requests-section { padding:16px 20px; }
+.detail-requests-label { font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:6px; font-weight:600; }
+.detail-requests-info { margin-bottom:16px; }
+.detail-requests-artifacts { display:flex; flex-wrap:wrap; gap:4px; }
+.detail-requests-params { margin-bottom:16px; }
+.detail-requests-params-grid { display:grid; grid-template-columns:auto 1fr; gap:4px 12px; font-size:12px; }
+.param-key { color:var(--accent-hover); font-size:11px; }
+.param-val { color:var(--text-secondary); font-size:11px; word-break:break-all; }
+.detail-requests-vql { margin-bottom:16px; }
+.detail-requests-raw { margin-bottom:8px; }
+.vql-code-block {
+  background:rgba(0,0,0,0.3); color:#a5d6ff; padding:12px 16px; border-radius:8px;
+  font-size:12px; font-family:var(--font-mono); overflow-x:auto; white-space:pre-wrap;
+  border:1px solid var(--border); max-height:300px; overflow-y:auto;
+}
+
+/* Clients tab */
+.clients-toolbar { display:flex; align-items:center; gap:8px; padding:10px 16px; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+.clients-pagination-controls { display:flex; align-items:center; gap:4px; }
+.clients-table th { white-space:nowrap; }
+.clickable-id {
+  color:#00c8ff; cursor:pointer; font-family:var(--font-mono); font-size:11px;
+  display:inline-flex; align-items:center; text-decoration:none;
+  transition:color 0.15s, text-decoration 0.15s;
+}
+.clickable-id:hover { color:#38bdf8; text-decoration:underline; }
 </style>
